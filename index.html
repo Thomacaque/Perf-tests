@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculateur Tests de Performance</title>
+<meta name="theme-color" content="#007bff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Perf Tests">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+    body { font-family: Arial, sans-serif; background: #f4f4f9; color: #333; padding: 10px; max-width: 520px; margin: auto; }
+    .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 15px; }
+    h2 { font-size: 1.05rem; color: #007bff; text-align: center; margin-top: 0; }
+    h3 { font-size: 0.9rem; margin: 12px 0 5px 0; }
+    .input-group { margin-bottom: 8px; }
+    label { display: block; font-size: 0.8rem; margin-bottom: 2px; font-weight: bold; }
+    input, select { width: 100%; padding: 7px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 0.95rem; }
+    .result { margin-top: 12px; padding: 10px; background: #e9ecef; border-radius: 6px; font-size: 0.9rem; }
+    .result p { margin: 4px 0; }
+    .highlight { color: #28a745; font-weight: bold; }
+    .warn { color: #b35c00; font-size: 0.8rem; margin-top: 6px; min-height: 1em; }
+    .note { font-size: 0.78rem; color: #666; margin: 0 0 8px 0; }
+    .refs { font-size: 0.72rem; color: #777; margin-top: 10px; border-top: 1px solid #eee; padding-top: 6px; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px; }
+    .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+    .tab-menu { display: flex; overflow-x: auto; gap: 5px; margin-bottom: 15px; padding-bottom: 5px; }
+    .tab-btn { flex: 0 0 auto; padding: 8px 12px; border: none; background: #ddd; cursor: pointer; font-weight: bold; font-size: 0.8rem; border-radius: 6px; }
+    .tab-btn.active { background: #007bff; color: white; }
+    .section { display: none; }
+    .section.active { display: block; }
+    .btn { padding: 8px 12px; border: none; background: #007bff; color: white; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: bold; }
+    .btn.sec { background: #6c757d; }
+    .btn.danger { background: #d9534f; }
+    .btn:disabled { opacity: 0.5; cursor: default; }
+    .btnrow { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+    .saved { font-size: 0.8rem; color: #28a745; }
+    .chart { margin-top: 10px; }
+    .chart svg { background: #fafafa; border-radius: 6px; }
+    .chart .ct { font-size: 0.75rem; color: #555; margin: 0 0 2px 2px; }
+    video { width: 100%; background: #000; border-radius: 6px; max-height: 320px; }
+    table.hist { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+    table.hist th, table.hist td { border-bottom: 1px solid #eee; padding: 4px 3px; text-align: right; white-space: nowrap; }
+    table.hist th:first-child, table.hist td:first-child { text-align: left; }
+    .scrollx { overflow-x: auto; }
+    .markrow { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; margin: 4px 0; }
+    .markrow span.t { flex: 1; }
+    .markrow button { padding: 4px 8px; font-size: 0.75rem; }
+    input[type=range] { padding: 0; }
+</style>
+</head>
+<body>
+
+<!-- PROFIL ATHLÈTE -->
+<div class="card">
+    <h2>Athlète</h2>
+    <div class="row3">
+        <div class="input-group"><label>Nom</label><input type="text" id="pNom" list="athList" placeholder="ex : Léa" autocomplete="off"><datalist id="athList"></datalist></div>
+        <div class="input-group"><label>Masse (kg)</label><input type="text" inputmode="decimal" id="pMasse" placeholder="75"></div>
+        <div class="input-group"><label>Taille (cm)</label><input type="text" inputmode="decimal" id="pTaille" placeholder="178"></div>
+    </div>
+    <div class="btnrow">
+        <button class="btn sec" id="pSave">Enregistrer l'athlète</button>
+        <button class="btn danger" id="pDel">Supprimer</button>
+        <span class="saved" id="pMsg"></span>
+    </div>
+    <p class="note" style="margin-top:6px">La masse et la taille sont reportées dans tous les onglets. Les données sont enregistrées dans ce navigateur, sur cet appareil uniquement.</p>
+</div>
+
+<div class="card">
+    <h2>Tests de Performance Sportive</h2>
+
+    <div class="tab-menu">
+        <button class="tab-btn active" data-tab="rast">RAST</button>
+        <button class="tab-btn" data-tab="rsa">Sprints répétés</button>
+        <button class="tab-btn" data-tab="fv">Profil F-V</button>
+        <button class="tab-btn" data-tab="sauts">Sauts</button>
+        <button class="tab-btn" data-tab="rsi">RSI</button>
+        <button class="tab-btn" data-tab="adv">Autres tests</button>
+        <button class="tab-btn" data-tab="video">Vidéo</button>
+        <button class="tab-btn" data-tab="histo">Historique</button>
+    </div>
+
+    <!-- 1. RAST -->
+    <div id="rast" class="section active">
+        <p class="note">Running-based Anaerobic Sprint Test : 6 × 35 m, 10 s de récupération entre chaque sprint.</p>
+        <div class="input-group"><label>Poids (kg)</label><input type="text" inputmode="decimal" id="poidsRast" placeholder="ex : 70"></div>
+        <div class="row3">
+            <div class="input-group"><label>S1 (s)</label><input type="text" inputmode="decimal" id="r1"></div>
+            <div class="input-group"><label>S2 (s)</label><input type="text" inputmode="decimal" id="r2"></div>
+            <div class="input-group"><label>S3 (s)</label><input type="text" inputmode="decimal" id="r3"></div>
+            <div class="input-group"><label>S4 (s)</label><input type="text" inputmode="decimal" id="r4"></div>
+            <div class="input-group"><label>S5 (s)</label><input type="text" inputmode="decimal" id="r5"></div>
+            <div class="input-group"><label>S6 (s)</label><input type="text" inputmode="decimal" id="r6"></div>
+        </div>
+        <div class="result">
+            <p>Puissance max : <span id="rastMax" class="highlight">-</span> W (<span id="rastMaxRel">-</span> W/kg)</p>
+            <p>Puissance moyenne : <span id="rastMean">-</span> W (<span id="rastMeanRel">-</span> W/kg)</p>
+            <p>Puissance min : <span id="rastMin">-</span> W</p>
+            <p>Indice de fatigue : <span id="rastFI" style="color:#d9534f;font-weight:bold;">-</span> W/s</p>
+            <p>Baisse de puissance : <span id="rastDrop">-</span> %</p>
+        </div>
+        <div class="chart" id="rastChart"></div>
+        <div class="warn" id="rastWarn"></div>
+        <div class="btnrow"><button class="btn" data-save="rast">Enregistrer ce résultat</button><span class="saved" id="saved-rast"></span></div>
+        <div class="refs">Puissance = masse × distance² / temps³ ; indice de fatigue = (Pmax − Pmin) / somme des 6 temps (Zacharogiannis et al., 2004 ; Draper &amp; Whyte, 1997).</div>
+    </div>
+
+    <!-- 2. SPRINTS RÉPÉTÉS -->
+    <div id="rsa" class="section">
+        <p class="note">Test de sprints répétés (ex. 6 × 40 m). Renseigne au moins 2 sprints (jusqu'à 10).</p>
+        <div class="row3" id="rsaInputs"></div>
+        <div class="result">
+            <p>Nombre de sprints : <span id="rsaN">-</span></p>
+            <p>Temps total : <span id="rsaTotal">-</span> s</p>
+            <p>Meilleur / pire : <span id="rsaBest">-</span> / <span id="rsaWorst">-</span> s</p>
+            <p>Temps moyen : <span id="rsaMean">-</span> s</p>
+            <p>Fatigue (total − n × meilleur) : <span id="rsaFatigue">-</span> s</p>
+            <p>Décrément en % (Sdec) : <span id="rsaDec" class="highlight">-</span> %</p>
+        </div>
+        <div class="chart" id="rsaChart"></div>
+        <div class="warn" id="rsaWarn"></div>
+        <div class="btnrow"><button class="btn" data-save="rsa">Enregistrer ce résultat</button><span class="saved" id="saved-rsa"></span></div>
+        <div class="refs">Sdec = 100 × (temps total / (n × meilleur temps)) − 100. Indice le plus fiable pour quantifier la fatigue en sprints répétés (Glaister et al., 2008, J Strength Cond Res ; Fitzsimons et al., 1993).</div>
+    </div>
+
+    <!-- 3. PROFIL F-V -->
+    <div id="fv" class="section">
+        <p class="note">Profil force-vitesse en sprint, méthode « simple » de Samozino et al. (2016), avec prise en compte de la résistance de l'air. Départ arrêté, chronométrage idéalement par cellules photoélectriques. Minimum 3 points (4 ou plus recommandés).</p>
+        <div class="row2">
+            <div class="input-group"><label>Masse (kg)</label><input type="text" inputmode="decimal" id="fvMasse" placeholder="75"></div>
+            <div class="input-group"><label>Taille (cm)</label><input type="text" inputmode="decimal" id="fvTaille" placeholder="178"></div>
+            <div class="input-group"><label>Température (°C)</label><input type="text" inputmode="decimal" id="fvTemp" value="20"></div>
+            <div class="input-group"><label>Pression (mmHg)</label><input type="text" inputmode="decimal" id="fvPress" value="760"></div>
+        </div>
+        <h3>Temps de passage (depuis le départ)</h3>
+        <div id="fvPoints"></div>
+        <div class="result">
+            <p>V0 (vitesse théorique max) : <span id="fvV0" class="highlight">-</span> m/s</p>
+            <p>F0 (force théorique max) : <span id="fvF0" class="highlight">-</span> N/kg (<span id="fvF0abs">-</span> N)</p>
+            <p>Pmax : <span id="fvPmax" class="highlight">-</span> W/kg (<span id="fvPmaxAbs">-</span> W)</p>
+            <p>Vitesse max modélisée (vmax) : <span id="fvVmax">-</span> m/s</p>
+            <p>Constante de temps τ : <span id="fvTau">-</span> s</p>
+            <p>RFmax : <span id="fvRF">-</span> % &nbsp; DRF : <span id="fvDRF">-</span> %/(m/s)</p>
+            <p>Erreur du modèle (RMSE) : <span id="fvRmse">-</span> m</p>
+        </div>
+        <div class="chart" id="fvChart"></div>
+        <div class="warn" id="fvWarn"></div>
+        <div class="btnrow"><button class="btn" data-save="fv">Enregistrer ce résultat</button><span class="saved" id="saved-fv"></span></div>
+        <div class="refs">Modèle v(t) = vmax(1 − e<sup>−t/τ</sup>) ajusté par moindres carrés sur les couples distance/temps ; F0 et V0 issus de la régression force-vitesse, Pmax = F0·V0/4 ; RF = Fh / √(Fh² + (m·g)²) (Samozino et al., 2016, Scand J Med Sci Sports ; Morin &amp; Samozino, 2016 ; Haugen et al., 2019 pour le chronométrage).</div>
+    </div>
+
+    <!-- 4. SAUTS -->
+    <div id="sauts" class="section">
+        <h3 style="margin-top:0">Countermovement Jump (CMJ)</h3>
+        <div class="row2">
+            <div class="input-group"><label>Masse (kg)</label><input type="text" inputmode="decimal" id="cmjMasse" placeholder="75"></div>
+            <div class="input-group"><label>Mesure</label>
+                <select id="cmjMode">
+                    <option value="h">Hauteur (cm)</option>
+                    <option value="t">Temps de vol (ms)</option>
+                </select>
+            </div>
+        </div>
+        <div class="input-group"><label id="cmjLabel">Hauteur CMJ (cm)</label><input type="text" inputmode="decimal" id="cmjVal" placeholder="35"></div>
+        <div class="result">
+            <p>Hauteur de saut : <span id="cmjH" class="highlight">-</span> cm</p>
+            <p>Vitesse de décollage : <span id="cmjV">-</span> m/s</p>
+            <p>Puissance pic (Sayers) : <span id="cmjPeak" class="highlight">-</span> W (<span id="cmjPeakRel">-</span> W/kg)</p>
+            <p>Puissance moyenne (Harman) : <span id="cmjMean">-</span> W</p>
+        </div>
+        <div class="warn" id="cmjWarn"></div>
+        <div class="btnrow"><button class="btn" data-save="cmj">Enregistrer le CMJ</button><span class="saved" id="saved-cmj"></span></div>
+
+        <h3>Saut en longueur sans élan (Broad Jump)</h3>
+        <div class="row3">
+            <div class="input-group"><label>Distance (cm)</label><input type="text" inputmode="decimal" id="bjDist" placeholder="240"></div>
+            <div class="input-group"><label>Taille (cm)</label><input type="text" inputmode="decimal" id="bjTaille" placeholder="178"></div>
+            <div class="input-group"><label>Angle (°)</label><input type="text" inputmode="decimal" id="bjAngle" value="25"></div>
+        </div>
+        <div class="result">
+            <p>Distance / taille : <span id="bjRatio" class="highlight">-</span></p>
+            <p>Vitesse de décollage estimée : <span id="bjV">-</span> m/s</p>
+        </div>
+        <div class="warn" id="bjWarn"></div>
+        <div class="btnrow"><button class="btn" data-save="bj">Enregistrer le broad jump</button><span class="saved" id="saved-bj"></span></div>
+        <div class="refs">Hauteur par temps de vol : h = g·t²/8 (Bosco et al., 1983). Vitesse de décollage v = √(2·g·h). Puissance pic CMJ (W) = 60,7·h(cm) + 45,3·masse − 2055, erreur type ≈ 355 W (Sayers et al., 1999). Puissance moyenne (W) = 21,2·h(cm) + 23,0·masse − 1393 (Harman et al., 1991). Broad jump : aucune formule validée ne donne la puissance à partir de la seule distance ; la vitesse de décollage est une estimation balistique simple (v = √(g·D / sin 2θ), angle d'environ 20–30°, Wakai &amp; Linthorne, 2005), à utiliser pour comparer un même athlète dans le temps.</div>
+    </div>
+
+    <!-- 5. RSI -->
+    <div id="rsi" class="section">
+        <p class="note">Reactive Strength Index (Drop Jump) = hauteur de saut / temps de contact au sol.</p>
+        <div class="row2">
+            <div class="input-group"><label>Mesure du saut</label>
+                <select id="rsiMode">
+                    <option value="h">Hauteur (cm)</option>
+                    <option value="t">Temps de vol (ms)</option>
+                </select>
+            </div>
+            <div class="input-group"><label id="rsiLabel">Hauteur (cm)</label><input type="text" inputmode="decimal" id="rsiVal" placeholder="35"></div>
+        </div>
+        <div class="input-group"><label>Temps de contact au sol (ms)</label><input type="text" inputmode="decimal" id="rsiContact" placeholder="180"></div>
+        <div class="result">
+            <p>Hauteur de saut : <span id="rsiH">-</span> cm</p>
+            <p>RSI : <span id="rsiRes" class="highlight">-</span> m/s</p>
+        </div>
+        <div class="warn" id="rsiWarn"></div>
+        <div class="btnrow"><button class="btn" data-save="rsi">Enregistrer ce résultat</button><span class="saved" id="saved-rsi"></span></div>
+        <div class="refs">RSI = hauteur (m) / temps de contact (s) (Flanagan &amp; Comyns, 2008). Un contact inférieur à 250 ms correspond à un cycle étirement-détente court (Schmidtbleicher, 1992). Pour comparer des RSI, garder la même hauteur de chute.</div>
+    </div>
+
+    <!-- 5b. AUTRES TESTS -->
+    <div id="adv" class="section">
+        <h3 style="margin-top:0">RSImod (CMJ)</h3>
+        <p class="note">Hauteur de saut / temps entre le début du mouvement et le décollage. Le temps de décollage vient d'une plateforme de force ou de la vidéo (onglet Vidéo, mode RSImod).</p>
+        <div class="row3">
+            <div class="input-group"><label>Mesure</label>
+                <select id="rmdMode"><option value="h">Hauteur (cm)</option><option value="t">Temps de vol (ms)</option></select>
+            </div>
+            <div class="input-group"><label id="rmdLabel">Hauteur (cm)</label><input type="text" inputmode="decimal" id="rmdVal" placeholder="35"></div>
+            <div class="input-group"><label>Temps de décollage (ms)</label><input type="text" inputmode="decimal" id="rmdT" placeholder="900"></div>
+        </div>
+        <div class="result">
+            <p>Hauteur : <span id="rmdH">-</span> cm</p>
+            <p>RSImod : <span id="rmdRes" class="highlight">-</span> m/s</p>
+        </div>
+        <div class="warn" id="rmdWarn"></div>
+        <div class="btnrow"><button class="btn" data-save="rsimod">Enregistrer</button><span class="saved" id="saved-rsimod"></span></div>
+
+        <h3>Indice de force excentrique (CMJ / SJ)</h3>
+        <div class="row2">
+            <div class="input-group"><label>Hauteur CMJ (cm)</label><input type="text" inputmode="decimal" id="eurCmj" placeholder="38"></div>
+            <div class="input-group"><label>Hauteur SJ (cm)</label><input type="text" inputmode="decimal" id="eurSj" placeholder="34"></div>
+        </div>
+        <div class="result">
+            <p>EUR (CMJ / SJ) : <span id="eurRes" class="highlight">-</span></p>
+            <p>Indice d'élasticité : <span id="eurElast">-</span> %</p>
+        </div>
+        <div class="warn" id="eurWarn"></div>
+        <div class="btnrow"><button class="btn" data-save="eur">Enregistrer</button><span class="saved" id="saved-eur"></span></div>
+
+        <h3>Asymétrie gauche / droite</h3>
+        <p class="note">Même épreuve des deux côtés (saut unilatéral, force, etc.). Pense à noter l'épreuve utilisée : seules les valeurs sont enregistrées.</p>
+        <div class="row2">
+            <div class="input-group"><label>Gauche</label><input type="text" inputmode="decimal" id="asymL" placeholder="22"></div>
+            <div class="input-group"><label>Droite</label><input type="text" inputmode="decimal" id="asymR" placeholder="25"></div>
+        </div>
+        <div class="result">
+            <p>Asymétrie : <span id="asymVal" class="highlight">-</span> % (côté le plus faible : <span id="asymWeak">-</span>)</p>
+            <p>Indice de symétrie (LSI) : <span id="asymLsi">-</span> %</p>
+        </div>
+        <div class="warn" id="asymWarn"></div>
+        <div class="btnrow"><button class="btn" data-save="asym">Enregistrer</button><span class="saved" id="saved-asym"></span></div>
+
+        <h3>Estimation du 1RM</h3>
+        <div class="row2">
+            <div class="input-group"><label>Charge soulevée (kg)</label><input type="text" inputmode="decimal" id="rmLoad" placeholder="80"></div>
+            <div class="input-group"><label>Répétitions (max)</label><input type="text" inputmode="decimal" id="rmReps" placeholder="5"></div>
+        </div>
+        <div class="result">
+            <p>1RM estimé (moyenne) : <span id="rmMean" class="highlight">-</span> kg</p>
+            <p>Epley : <span id="rmEpley">-</span> kg · Brzycki : <span id="rmBrz">-</span> kg · Lombardi : <span id="rmLom">-</span> kg</p>
+            <p id="rmTable">-</p>
+        </div>
+        <div class="warn" id="rmWarn"></div>
+        <div class="btnrow"><button class="btn" data-save="rm">Enregistrer</button><span class="saved" id="saved-rm"></span></div>
+
+        <div class="refs">RSImod = hauteur (m) / temps de décollage (s) (Ebben &amp; Petushek, 2010). EUR = hauteur CMJ / hauteur SJ ; indice d'élasticité = (CMJ − SJ) / SJ × 100 (Bosco et al., 1983 ; McGuigan et al., 2006). Asymétrie = (max − min) / max × 100 ; LSI = min / max × 100 (Bishop et al., 2018) ; des seuils de 10 à 15 % sont souvent cités mais dépendent de l'épreuve et de la variabilité de l'athlète. 1RM : Epley = c·(1 + r/30) ; Brzycki = c·36/(37 − r) ; Lombardi = c·r<sup>0,10</sup> ; la fiabilité baisse nettement au-delà de 10 répétitions, et r = 1 donne la charge elle-même.</div>
+    </div>
+
+    <!-- 6. VIDÉO -->
+    <div id="video" class="section">
+        <p class="note">Mesure sur vidéo par pointage image par image. La vidéo reste sur ton appareil (rien n'est envoyé). Filme de côté, caméra fixe, athlète entier dans le cadre.</p>
+        <div class="row2">
+            <div class="input-group"><label>Test</label>
+                <select id="vidMode">
+                    <option value="cmj">CMJ (temps de vol)</option>
+                    <option value="rsi">Drop jump (RSI)</option>
+                    <option value="rsimod">CMJ (RSImod)</option>
+                </select>
+            </div>
+            <div class="input-group"><label>Vidéo</label><input type="file" id="vidFile" accept="video/*"></div>
+            <div class="input-group"><label>Fréquence du fichier (img/s)</label><input type="text" inputmode="decimal" id="vidFileFps" value="240"></div>
+            <div class="input-group"><label>Fréquence de capture (img/s)</label><input type="text" inputmode="decimal" id="vidCapFps" value="240"></div>
+        </div>
+        <p class="note">Ces deux valeurs sont identiques pour une vidéo normale (ex. 120/120). Pour un ralenti iPhone converti en 30 img/s, mets 30 pour le fichier et 240 pour la capture. Une mauvaise valeur fausse tous les résultats.</p>
+        <video id="vid" playsinline muted preload="auto"></video>
+        <div class="input-group" style="margin-top:6px"><input type="range" id="vidSlider" min="0" max="0" value="0" step="1"></div>
+        <p class="note" id="vidInfo">Aucune vidéo chargée.</p>
+        <div class="btnrow">
+            <button class="btn sec" data-step="-10">−10</button>
+            <button class="btn sec" data-step="-1">◀ −1</button>
+            <button class="btn sec" data-step="1">+1 ▶</button>
+            <button class="btn sec" data-step="10">+10</button>
+            <button class="btn sec" id="vidPlay">Lecture ralentie</button>
+        </div>
+        <p class="note" style="margin-top:6px">Astuce : flèches ← → du clavier pour avancer d'une image.</p>
+        <h3>Détection automatique (bêta)</h3>
+        <p class="note">L'outil propose les marques à partir du mouvement des pieds. C'est une aide : vérifie toujours les marques avec « Aller » et corrige-les à la main si besoin. Limite la plage d'images pour aller plus vite : une vidéo de 5 s à 240 img/s représente 1200 images. Pour le mode RSImod, seuls décollage et atterrissage sont proposés ; le début du mouvement reste à marquer.</p>
+        <div class="input-group"><label>Méthode</label>
+            <select id="autoMethod">
+                <option value="trk">Suivi d'un point du pied (jambes seules, sans Internet)</option>
+                <option value="pose">Pose du corps (corps entier visible, Internet requis)</option>
+            </select>
+        </div>
+        <div class="row3">
+            <div class="input-group"><label>Image début</label><input type="text" inputmode="numeric" id="autoFrom" value="0"></div>
+            <div class="input-group"><label>Image fin</label><input type="text" inputmode="numeric" id="autoTo" placeholder="fin"></div>
+            <div class="input-group"><label id="autoThrLabel">Seuil (% amplitude)</label><input type="text" inputmode="decimal" id="autoThr" value="8"></div>
+        </div>
+        <div id="trkBlock">
+            <p class="note">Méthode « suivi » : va à une image où le pied est posé, puis touche l'image ci-dessous sur le bout de la chaussure (ou sur un scotch de couleur collé dessus). Choisis un point bien contrasté, visible sur toute la vidéo, à l'avant du pied : le talon se lève avant le décollage et fausserait la détection. Le point est ensuite suivi image par image.</p>
+            <canvas id="trkCanvas" width="320" height="180" style="width:100%;border-radius:6px;background:#000;touch-action:manipulation"></canvas>
+            <p class="note" id="trkInfo">Aucun point choisi.</p>
+        </div>
+        <p class="note" id="poseNote" style="display:none">Méthode « pose » : un modèle (MediaPipe) repère le corps. Il faut voir la personne en entier (au moins des hanches aux pieds) ; avec les jambes seules, utilise le suivi. Modèle de quelques Mo à télécharger la première fois.</p>
+        <div class="btnrow">
+            <button class="btn sec" id="autoFromCur">Début = image actuelle</button>
+            <button class="btn sec" id="autoToCur">Fin = image actuelle</button>
+        </div>
+        <div class="btnrow">
+            <button class="btn" id="autoRun">Détecter les marques</button>
+            <button class="btn danger" id="autoCancel" disabled>Annuler</button>
+        </div>
+        <p class="note" id="autoStatus"></p>
+        <div class="chart" id="autoChart"></div>
+
+        <h3>Marques</h3>
+        <div id="vidMarks"></div>
+        <div class="result">
+            <p id="vidR1">-</p>
+            <p id="vidR2">-</p>
+            <p id="vidR3">-</p>
+            <p id="vidR4">-</p>
+        </div>
+        <div class="warn" id="vidWarn"></div>
+        <div class="btnrow"><button class="btn" data-save="vid">Enregistrer ce résultat</button><span class="saved" id="saved-vid"></span></div>
+        <div class="refs">Hauteur = g·t²/8 à partir du temps de vol compté en images (Balsalobre-Fernández et al., 2015, application My Jump). RSI = hauteur / temps de contact (Flanagan &amp; Comyns, 2008). Précision : ±1 image par marque, soit ±(1000/fps) ms. À 30 img/s la mesure est trop grossière ; viser 120 img/s ou plus (240 idéalement). La méthode suppose un décollage et un atterrissage jambes tendues, pointes de pieds. RSImod = hauteur / temps entre le début du mouvement et le décollage (Ebben &amp; Petushek, 2010) ; le début du mouvement est un repère subjectif, garde le même critère d'une séance à l'autre. La détection automatique repose sur le modèle de pose MediaPipe (Google) ; elle n'a pas été validée contre une plateforme de force.</div>
+    </div>
+
+    <!-- 7. HISTORIQUE -->
+    <div id="histo" class="section">
+        <p class="note" id="histoWho">Historique de l'athlète sélectionné.</p>
+        <div class="row3">
+            <div class="input-group"><label>Test</label><select id="hTest"></select></div>
+            <div class="input-group"><label>Indicateur</label><select id="hMetric"></select></div>
+            <div class="input-group"><label>Athlète</label><select id="hAth"></select></div>
+        </div>
+        <div class="chart" id="hChart"></div>
+        <div class="scrollx"><table class="hist" id="hTable"></table></div>
+        <div class="btnrow">
+            <button class="btn" id="hCsv">Exporter tout en CSV</button>
+            <span class="saved" id="hMsg"></span>
+        </div>
+        <p class="note" style="margin-top:6px">Le CSV s'ouvre directement dans Excel (séparateur « ; », virgule décimale). Pense à l'exporter régulièrement : effacer les données du navigateur supprime l'historique.</p>
+    </div>
+</div>
+
+<script>
+const G = 9.81;
+
+/* ---------- Utilitaires ---------- */
+function val(id) {
+    const v = parseFloat(String(document.getElementById(id).value).replace(',', '.'));
+    return v;
+}
+function setText(id, txt) { document.getElementById(id).textContent = txt; }
+function fmt(x, d) { return (isFinite(x) ? x.toFixed(d) : '-'); }
+function clearIds(ids) { ids.forEach(i => setText(i, '-')); }
+function sum(a) { return a.reduce((s, x) => s + x, 0); }
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+function linReg(x, y) {
+    const n = x.length, mx = sum(x) / n, my = sum(y) / n;
+    let sxy = 0, sxx = 0;
+    for (let i = 0; i < n; i++) { sxy += (x[i] - mx) * (y[i] - my); sxx += (x[i] - mx) ** 2; }
+    const slope = sxy / sxx;
+    return { slope: slope, intercept: my - slope * mx };
+}
+
+/* ---------- Fonctions de calcul (pures) ---------- */
+function rastCalc(m, times) {
+    const p = times.map(t => (m * 35 * 35) / (t ** 3));
+    const max = Math.max(...p), min = Math.min(...p);
+    const total = sum(times);
+    return { p: p, max: max, min: min, mean: sum(p) / p.length, fi: (max - min) / total, drop: (max - min) / max * 100 };
+}
+
+function rsaCalc(times) {
+    const n = times.length, total = sum(times), best = Math.min(...times), worst = Math.max(...times);
+    return { n: n, total: total, best: best, worst: worst, mean: total / n,
+             fatigue: total - n * best, sdec: 100 * total / (n * best) - 100 };
+}
+
+/* Ajustement x(t) = vmax * (t - tau*(1 - exp(-t/tau))) par moindres carrés */
+function fitSprint(pts) {
+    let best = null;
+    for (let tau = 0.2; tau <= 4.0; tau += 0.002) {
+        let sgd = 0, sgg = 0;
+        const g = pts.map(p => p.t - tau * (1 - Math.exp(-p.t / tau)));
+        for (let i = 0; i < pts.length; i++) { sgd += g[i] * pts[i].d; sgg += g[i] * g[i]; }
+        const vmax = sgd / sgg;
+        let sse = 0;
+        for (let i = 0; i < pts.length; i++) sse += (pts[i].d - vmax * g[i]) ** 2;
+        if (!best || sse < best.sse) best = { tau: tau, vmax: vmax, sse: sse };
+    }
+    best.rmse = Math.sqrt(best.sse / pts.length);
+    return best;
+}
+
+function fvProfile(m, Hcm, tempC, pmmHg, pts) {
+    const fit = fitSprint(pts);
+    const tau = fit.tau, vmax = fit.vmax;
+    const rho = 1.293 * (pmmHg / 760) * (273 / (273 + tempC));
+    const Af = 0.2025 * Math.pow(Hcm / 100, 0.725) * Math.pow(m, 0.425) * 0.266;
+    const k = 0.5 * rho * Af * 0.9;
+    const tEnd = Math.max(...pts.map(p => p.t));
+    const N = 200, v = [], fh = [], rf = [];
+    for (let i = 0; i <= N; i++) {
+        const t = tEnd * i / N;
+        const vi = vmax * (1 - Math.exp(-t / tau));
+        const ai = (vmax / tau) * Math.exp(-t / tau);
+        const f = m * ai + k * vi * vi;
+        v.push(vi); fh.push(f); rf.push(100 * f / Math.sqrt(f * f + (m * G) ** 2));
+    }
+    const reg = linReg(v, fh);
+    const F0abs = reg.intercept, V0 = -reg.intercept / reg.slope;
+    const Pabs = F0abs * V0 / 4;
+    const drf = linReg(v, rf).slope;
+    return { vmax: vmax, tau: tau, rmse: fit.rmse, F0abs: F0abs, F0: F0abs / m, V0: V0,
+             Pabs: Pabs, P: Pabs / m, RFmax: rf[0], DRF: drf, v: v, fh: fh };
+}
+
+function jumpHeightFromFlight(tMs) { const t = tMs / 1000; return G * t * t / 8 * 100; } // cm
+
+function cmjCalc(m, hCm) {
+    return { v: Math.sqrt(2 * G * hCm / 100),
+             peak: 60.7 * hCm + 45.3 * m - 2055,
+             mean: 21.2 * hCm + 23.0 * m - 1393 };
+}
+
+function broadCalc(distCm, tailleCm, angleDeg) {
+    const out = { ratio: tailleCm > 0 ? distCm / tailleCm : NaN, v: NaN };
+    const a = angleDeg * Math.PI / 180;
+    if (a > 0 && a < Math.PI / 2) out.v = Math.sqrt(G * (distCm / 100) / Math.sin(2 * a));
+    return out;
+}
+
+/* Mesure vidéo : les durées sont comptées en images, converties avec la fréquence de capture */
+function videoCalc(mode, marks, capFps) {
+    const dt = 1000 / capFps; // ms par image
+    if (mode === 'cmj') {
+        if (marks[0] == null || marks[1] == null || marks[1] <= marks[0]) return null;
+        const tf = (marks[1] - marks[0]) / capFps * 1000; // ms
+        const h = jumpHeightFromFlight(tf);
+        return { flight: tf, h: h, dt: dt, errH: 2 * dt / tf * 100 };
+    }
+    if (marks[0] == null || marks[1] == null || marks[2] == null || marks[1] <= marks[0] || marks[2] <= marks[1]) return null;
+    if (mode === 'rsimod') {
+        const tto = (marks[1] - marks[0]) / capFps * 1000;
+        const tfl = (marks[2] - marks[1]) / capFps * 1000;
+        const hh = jumpHeightFromFlight(tfl);
+        return { tto: tto, flight: tfl, h: hh, rsimod: rsimodCalc(hh, tto), dt: dt, errH: 2 * dt / tfl * 100 };
+    }
+    const gct = (marks[1] - marks[0]) / capFps * 1000;
+    const tf = (marks[2] - marks[1]) / capFps * 1000;
+    const h = jumpHeightFromFlight(tf);
+    return { contact: gct, flight: tf, h: h, rsi: (h / 100) / (gct / 1000), dt: dt,
+             errH: 2 * dt / tf * 100, errC: dt / gct * 100 };
+}
+
+/* ---------- Nouveaux tests (fonctions pures) ---------- */
+function rsimodCalc(hCm, ttoMs) { return (hCm / 100) / (ttoMs / 1000); }
+function eurCalc(cmj, sj) { return { eur: cmj / sj, elast: (cmj - sj) / sj * 100 }; }
+function asymCalc(a, b) {
+    const hi = Math.max(a, b), lo = Math.min(a, b);
+    return { lsi: lo / hi * 100, asym: (hi - lo) / hi * 100, weaker: a < b ? 'gauche' : (b < a ? 'droite' : 'aucun') };
+}
+function rmCalc(w, r) {
+    if (r === 1) return { epley: w, brzycki: w, lombardi: w, mean: w };
+    const e = w * (1 + r / 30), b = w * 36 / (37 - r), l = w * Math.pow(r, 0.10);
+    return { epley: e, brzycki: b, lombardi: l, mean: (e + b + l) / 3 };
+}
+
+/* ---------- Détection automatique décollage / atterrissage / contact ---------- */
+/* ys : position verticale (coord. normalisée, y vers le bas) du point le plus bas des pieds, NaN si non détecté.
+   L  : longueur de jambe en unités de y. Retourne des indices d'images relatifs au début de ys. */
+function fillNaN(a) {
+    const out = a.slice(), n = out.length;
+    let first = out.findIndex(v => isFinite(v));
+    if (first < 0) return out;
+    for (let i = 0; i < first; i++) out[i] = out[first];
+    let last = first;
+    for (let i = first + 1; i < n; i++) {
+        if (isFinite(out[i])) {
+            for (let k = last + 1; k < i; k++) out[k] = out[last] + (out[i] - out[last]) * (k - last) / (i - last);
+            last = i;
+        }
+    }
+    for (let i = last + 1; i < n; i++) out[i] = out[last];
+    return out;
+}
+function movAvg(a, w) {
+    if (w <= 1) return a.slice();
+    const h = (w - 1) / 2, out = [];
+    for (let i = 0; i < a.length; i++) {
+        let s = 0, c = 0;
+        for (let k = Math.max(0, i - h); k <= Math.min(a.length - 1, i + h); k++) { s += a[k]; c++; }
+        out.push(s / c);
+    }
+    return out;
+}
+function percentile(a, p) {
+    const s = a.slice().sort((x, y) => x - y);
+    return s[Math.min(s.length - 1, Math.max(0, Math.round(p / 100 * (s.length - 1))))];
+}
+function median(a) { return percentile(a, 50); }
+/* Échelle d'un signal sans longueur de jambe connue : amplitude entre le sol (95e centile) et le point le plus haut (2e centile) */
+function signalScale(ys, capFps) {
+    const w = capFps >= 200 ? 5 : capFps >= 100 ? 3 : 1;
+    const y = movAvg(fillNaN(ys), w);
+    return percentile(y, 95) - percentile(y, 2);
+}
+function runsOf(flags) {
+    const runs = [];
+    let s = 0;
+    for (let i = 1; i <= flags.length; i++) {
+        if (i === flags.length || flags[i] !== flags[s]) { runs.push({ air: flags[s], s: s, e: i - 1 }); s = i; }
+    }
+    return runs;
+}
+function despeckle(flags, minFrames) {
+    let f = flags.slice();
+    for (let it = 0; it < 6; it++) {
+        const runs = runsOf(f);
+        let changed = false;
+        runs.forEach((r, i) => {
+            if (i > 0 && i < runs.length - 1 && (r.e - r.s + 1) < minFrames) {
+                for (let k = r.s; k <= r.e; k++) f[k] = !f[k];
+                changed = true;
+            }
+        });
+        if (!changed) break;
+    }
+    return f;
+}
+
+function detectJumpMarks(ys, L, capFps, mode, thrFrac) {
+    const n = ys.length, fail = msg => ({ ok: false, marks: [], notes: [msg] });
+    if (!(L > 0)) return fail('Longueur de jambe introuvable : athlète non détecté.');
+    if (ys.filter(v => isFinite(v)).length < 0.7 * n) return fail('Athlète détecté sur moins de 70 % des images : vérifie le cadrage (plan latéral, athlète entier).');
+    const w = capFps >= 200 ? 5 : capFps >= 100 ? 3 : 1;
+    const y = movAvg(fillNaN(ys), w);
+    const g = percentile(y, 95), thr = thrFrac * L;           // niveau du sol = position la plus basse (95e centile)
+    const minF = Math.max(2, Math.round(capFps * 0.02));
+    const air = despeckle(y.map(v => v < g - thr), minF);
+    const runs = runsOf(air);
+    const sig = { y: y, g: g, thr: thr };
+    const dur = r => (r.e - r.s + 1) / capFps * 1000;
+    // Le franchissement du seuil survient après le vrai décollage (et avant le vrai contact) : on corrige par thr / vitesse du pied
+    const slope = (i, dir) => { const j = Math.max(0, Math.min(n - 1, i + dir * 3)); return Math.max(Math.abs(y[j] - y[i]) / 3, 1e-6); };
+    const takeoffFrame = r => Math.max(0, Math.round(r.s - Math.min(4, thr / slope(r.s, +1))));
+    const landFrame = r => Math.min(n - 1, Math.round(r.e + 1 + Math.min(4, thr / slope(r.e, -1))));
+
+    if (mode === 'cmj') {
+        let best = null;
+        runs.forEach((r, i) => { if (r.air && i > 0 && i < runs.length - 1 && dur(r) >= 100 && (!best || dur(r) > dur(best))) best = r; });
+        if (!best) return Object.assign(fail('Aucune phase de vol repérée : saut non détecté (essaie un seuil plus bas).'), sig);
+        return Object.assign({ ok: true, marks: [takeoffFrame(best), landFrame(best)], notes: [] }, sig);
+    }
+    // drop jump : phase aérienne (chute) -> contact -> phase aérienne (saut) -> sol
+    let cand = null;
+    for (let i = 1; i + 2 < runs.length; i++) {
+        const E1 = runs[i - 1], G = runs[i], E2 = runs[i + 1];
+        if (E1.air && !G.air && E2.air && dur(G) >= 40 && dur(G) <= 600 && dur(E2) >= 120 && (!cand || dur(E2) > dur(cand.E2))) cand = { E1: E1, G: G, E2: E2 };
+    }
+    if (!cand) return Object.assign(fail('Séquence chute → contact → saut non repérée (essaie un seuil plus bas, ou filme la chute en entier).'), sig);
+    return Object.assign({ ok: true, marks: [landFrame(cand.E1), takeoffFrame(cand.E2), landFrame(cand.E2)], notes: [] }, sig);
+}
+
+/* ---------- Suivi d'un point par comparaison de blocs (template matching) ---------- */
+function grayFromRGBA(data, n) {
+    const g = new Float32Array(n);
+    for (let i = 0, j = 0; i < n; i++, j += 4) g[i] = 0.299 * data[j] + 0.587 * data[j + 1] + 0.114 * data[j + 2];
+    return g;
+}
+function extractPatch(gray, w, h, cx, cy, half) {
+    const s = 2 * half + 1, p = new Float32Array(s * s);
+    for (let j = -half; j <= half; j++) {
+        const yy = Math.min(h - 1, Math.max(0, cy + j));
+        for (let i = -half; i <= half; i++) p[(j + half) * s + i + half] = gray[yy * w + Math.min(w - 1, Math.max(0, cx + i))];
+    }
+    return p;
+}
+function patchContrast(p) {
+    let m = 0; for (let i = 0; i < p.length; i++) m += p[i];
+    m /= p.length;
+    let v = 0; for (let i = 0; i < p.length; i++) v += (p[i] - m) * (p[i] - m);
+    return Math.sqrt(v / p.length);
+}
+/* somme des écarts absolus entre le bloc de référence et l'image centrée en (cx, cy) ; abandon si > cutoff */
+function sadAt(gray, w, tpl, half, cx, cy, cutoff) {
+    const s = 2 * half + 1;
+    let sum = 0;
+    for (let j = -half; j <= half; j++) {
+        const row = (cy + j) * w + cx, trow = (j + half) * s + half;
+        for (let i = -half; i <= half; i++) sum += Math.abs(gray[row + i] - tpl[trow + i]);
+        if (sum > cutoff) return sum;
+    }
+    return sum;
+}
+function searchBest(gray, w, h, tpl, half, px, py, R) {
+    const N = (2 * half + 1) * (2 * half + 1), rx = Math.round(px), ry = Math.round(py);
+    const x0 = Math.max(half, rx - R), x1 = Math.min(w - half - 1, rx + R);
+    const y0 = Math.max(half, ry - R), y1 = Math.min(h - half - 1, ry + R);
+    let best = Infinity, bx = Math.min(x1, Math.max(x0, rx)), by = Math.min(y1, Math.max(y0, ry));
+    for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
+        const s = sadAt(gray, w, tpl, half, cx, cy, best);
+        if (s < best) { best = s; bx = cx; by = cy; }
+    }
+    return { x: bx, y: by, sad: best / N };
+}
+function parabolaOffset(a, b, c) {
+    const d = a - 2 * b + c;
+    if (d <= 1e-9) return 0;
+    return Math.max(-0.5, Math.min(0.5, 0.5 * (a - c) / d));
+}
+function makeTracker(gray, w, h, x, y, half) {
+    return { tpl: extractPatch(gray, w, h, Math.round(x), Math.round(y), half), half: half, x: Math.round(x), y: Math.round(y), vx: 0, vy: 0 };
+}
+function cloneTracker(t) { return { tpl: t.tpl.slice(), half: t.half, x: t.x, y: t.y, vx: 0, vy: 0 }; }
+/* Un pas de suivi : recherche autour de la position prédite (vitesse constante), élargie si la correspondance est mauvaise */
+function trackFrame(tr, gray, w, h) {
+    const half = tr.half, N = (2 * half + 1) * (2 * half + 1);
+    let r = searchBest(gray, w, h, tr.tpl, half, tr.x + tr.vx, tr.y + tr.vy, 14);
+    if (r.sad > 12) {
+        const r2 = searchBest(gray, w, h, tr.tpl, half, tr.x, tr.y, 40);
+        if (r2.sad < r.sad) r = r2;
+    }
+    let fx = r.x, fy = r.y;
+    if (r.x > half && r.x < w - half - 1 && r.y > half && r.y < h - half - 1) {
+        const s0 = r.sad * N;
+        fx += parabolaOffset(sadAt(gray, w, tr.tpl, half, r.x - 1, r.y, Infinity), s0, sadAt(gray, w, tr.tpl, half, r.x + 1, r.y, Infinity));
+        fy += parabolaOffset(sadAt(gray, w, tr.tpl, half, r.x, r.y - 1, Infinity), s0, sadAt(gray, w, tr.tpl, half, r.x, r.y + 1, Infinity));
+    }
+    tr.vx = fx - tr.x; tr.vy = fy - tr.y; tr.x = fx; tr.y = fy;
+    if (r.sad < 8) { // mise à jour lente du modèle quand la correspondance est bonne
+        const np = extractPatch(gray, w, h, r.x, r.y, half);
+        for (let i = 0; i < tr.tpl.length; i++) tr.tpl[i] = 0.9 * tr.tpl[i] + 0.1 * np[i];
+    }
+    return { x: fx, y: fy, sad: r.sad };
+}
+
+/* ---------- Graphiques SVG ---------- */
+function niceTicks(min, max, n) {
+    const span = (max - min) || 1, step0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+    const norm = step0 / mag, step = (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag;
+    const out = [];
+    for (let v = Math.floor(min / step) * step; v <= max + step * 0.001; v += step) out.push(+v.toFixed(10));
+    return out;
+}
+
+/* o : {title, xmin, xmax, ymin, ymax, xticks:[{x,label}], series:[{type:'bars'|'line'|'dots', pts:[{x,y}], color}], xlabel, ylabel} */
+function svgChart(o) {
+    const W = 440, H = 210, l = 46, r = 12, t = 10, b = 38, pw = W - l - r, ph = H - t - b;
+    const yt = niceTicks(o.ymin, o.ymax, 4);
+    const ymin = Math.min(o.ymin, yt[0]), ymax = Math.max(o.ymax, yt[yt.length - 1]);
+    const X = x => l + (x - o.xmin) / ((o.xmax - o.xmin) || 1) * pw;
+    const Y = y => t + ph - (y - ymin) / ((ymax - ymin) || 1) * ph;
+    let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="' + esc(o.title || '') + '" font-family="Arial" font-size="10">';
+    yt.forEach(v => {
+        s += '<line x1="' + l + '" x2="' + (W - r) + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="#ddd"/>' +
+             '<text x="' + (l - 4) + '" y="' + (Y(v) + 3) + '" text-anchor="end" fill="#666">' + +v.toPrecision(4) + '</text>';
+    });
+    (o.xticks || []).forEach(tk => {
+        s += '<text x="' + X(tk.x) + '" y="' + (t + ph + 13) + '" text-anchor="middle" fill="#666">' + esc(tk.label) + '</text>';
+    });
+    s += '<line x1="' + l + '" x2="' + (W - r) + '" y1="' + (t + ph) + '" y2="' + (t + ph) + '" stroke="#999"/>' +
+         '<line x1="' + l + '" x2="' + l + '" y1="' + t + '" y2="' + (t + ph) + '" stroke="#999"/>';
+    o.series.forEach(se => {
+        const c = se.color || '#007bff';
+        if (se.type === 'bars') {
+            const bw = pw / se.pts.length * 0.6;
+            se.pts.forEach(p => { s += '<rect x="' + (X(p.x) - bw / 2) + '" y="' + Y(p.y) + '" width="' + bw + '" height="' + Math.max(0, Y(ymin) - Y(p.y)) + '" fill="' + c + '" rx="2"/>'; });
+        } else {
+            if (se.type === 'line' || se.type === 'dotline') s += '<polyline fill="none" stroke="' + c + '" stroke-width="2" points="' + se.pts.map(p => X(p.x).toFixed(1) + ',' + Y(p.y).toFixed(1)).join(' ') + '"/>';
+            if (se.type === 'dots' || se.type === 'dotline') se.pts.forEach(p => { s += '<circle cx="' + X(p.x) + '" cy="' + Y(p.y) + '" r="3" fill="' + c + '"/>'; });
+        }
+    });
+    if (o.xlabel) s += '<text x="' + (l + pw / 2) + '" y="' + (H - 4) + '" text-anchor="middle" fill="#555">' + esc(o.xlabel) + '</text>';
+    if (o.ylabel) s += '<text transform="translate(11 ' + (t + ph / 2) + ') rotate(-90)" text-anchor="middle" fill="#555">' + esc(o.ylabel) + '</text>';
+    return s + '</svg>';
+}
+function showChart(id, title, o) {
+    const el = document.getElementById(id);
+    el.innerHTML = o ? '<p class="ct">' + esc(title) + '</p>' + svgChart(o) : '';
+}
+function padRange(vals) {
+    const lo = Math.min(...vals), hi = Math.max(...vals), d = (hi - lo) || Math.abs(hi) * 0.1 || 1;
+    return [lo - d * 0.3, hi + d * 0.3];
+}
+
+/* ---------- Résultats courants (pour l'enregistrement) ---------- */
+const LAST = {};
+function setLast(key, test, v) { LAST[key] = v ? { test: test, v: v } : null; setText('saved-' + key, ''); }
+
+/* ---------- Calculs et interface ---------- */
+function calculRast() {
+    const m = val('poidsRast');
+    const times = ['r1','r2','r3','r4','r5','r6'].map(val);
+    const ids = ['rastMax','rastMaxRel','rastMean','rastMeanRel','rastMin','rastFI','rastDrop'];
+    setText('rastWarn', ''); showChart('rastChart', '', null); setLast('rast', 'rast', null);
+    if (isNaN(m) || times.some(isNaN)) { clearIds(ids); return; }
+    if (m <= 0 || times.some(t => t <= 0)) { clearIds(ids); setText('rastWarn', 'Les valeurs doivent être positives.'); return; }
+    if (times.some(t => t < 3 || t > 10)) setText('rastWarn', 'Temps hors plage habituelle pour 35 m (≈ 4–7 s) : vérifie la saisie.');
+    const r = rastCalc(m, times);
+    setText('rastMax', fmt(r.max, 0)); setText('rastMaxRel', fmt(r.max / m, 1));
+    setText('rastMean', fmt(r.mean, 0)); setText('rastMeanRel', fmt(r.mean / m, 1));
+    setText('rastMin', fmt(r.min, 0));
+    setText('rastFI', fmt(r.fi, 2)); setText('rastDrop', fmt(r.drop, 1));
+    setLast('rast', 'rast', { Pmax: r.max, Pmoy: r.mean, FI: r.fi, Baisse: r.drop });
+    showChart('rastChart', 'Puissance par sprint (W)', {
+        xmin: -0.5, xmax: 5.5, ymin: 0, ymax: Math.max(...r.p) * 1.1,
+        xticks: r.p.map((_, i) => ({ x: i, label: 'S' + (i + 1) })),
+        series: [{ type: 'bars', pts: r.p.map((y, i) => ({ x: i, y: y })) }], ylabel: 'W'
+    });
+}
+
+function calculRsa() {
+    const ids = ['rsaN','rsaTotal','rsaBest','rsaWorst','rsaMean','rsaFatigue','rsaDec'];
+    const times = [];
+    for (let i = 1; i <= 10; i++) { const v = val('s' + i); if (!isNaN(v)) times.push(v); }
+    setText('rsaWarn', ''); showChart('rsaChart', '', null); setLast('rsa', 'rsa', null);
+    if (times.length < 2) { clearIds(ids); return; }
+    if (times.some(t => t <= 0)) { clearIds(ids); setText('rsaWarn', 'Les temps doivent être positifs.'); return; }
+    const r = rsaCalc(times);
+    setText('rsaN', r.n);
+    setText('rsaTotal', fmt(r.total, 2)); setText('rsaBest', fmt(r.best, 2)); setText('rsaWorst', fmt(r.worst, 2));
+    setText('rsaMean', fmt(r.mean, 2)); setText('rsaFatigue', fmt(r.fatigue, 2)); setText('rsaDec', fmt(r.sdec, 2));
+    setLast('rsa', 'rsa', { Sdec: r.sdec, Total: r.total, Meilleur: r.best });
+    const rg = padRange(times);
+    showChart('rsaChart', 'Temps par sprint (s)', {
+        xmin: -0.5, xmax: times.length - 0.5, ymin: rg[0], ymax: rg[1],
+        xticks: times.map((_, i) => ({ x: i, label: 'S' + (i + 1) })),
+        series: [{ type: 'dotline', pts: times.map((y, i) => ({ x: i, y: y })) }], ylabel: 's'
+    });
+}
+
+function calculFV() {
+    const ids = ['fvV0','fvF0','fvF0abs','fvPmax','fvPmaxAbs','fvVmax','fvTau','fvRF','fvDRF','fvRmse'];
+    setText('fvWarn', ''); showChart('fvChart', '', null); setLast('fv', 'fv', null);
+    const m = val('fvMasse'), H = val('fvTaille'), T = val('fvTemp'), P = val('fvPress');
+    const pts = [];
+    for (let i = 1; i <= 8; i++) {
+        const d = val('fvD' + i), t = val('fvT' + i);
+        if (!isNaN(d) && !isNaN(t) && d > 0 && t > 0) pts.push({ d: d, t: t });
+    }
+    if (isNaN(m) || isNaN(H) || isNaN(T) || isNaN(P) || pts.length < 3) { clearIds(ids); return; }
+    pts.sort((a, b) => a.d - b.d);
+    for (let i = 1; i < pts.length; i++) {
+        if (pts[i].t <= pts[i - 1].t) { clearIds(ids); setText('fvWarn', 'Les temps doivent augmenter avec la distance.'); return; }
+    }
+    const r = fvProfile(m, H, T, P, pts);
+    if (!isFinite(r.V0) || r.V0 <= 0 || r.F0 <= 0) { clearIds(ids); setText('fvWarn', 'Données incohérentes : impossible d\'ajuster le modèle.'); return; }
+    setText('fvV0', fmt(r.V0, 2)); setText('fvF0', fmt(r.F0, 2)); setText('fvF0abs', fmt(r.F0abs, 0));
+    setText('fvPmax', fmt(r.P, 1)); setText('fvPmaxAbs', fmt(r.Pabs, 0));
+    setText('fvVmax', fmt(r.vmax, 2)); setText('fvTau', fmt(r.tau, 2));
+    setText('fvRF', fmt(r.RFmax, 1)); setText('fvDRF', fmt(r.DRF, 2)); setText('fvRmse', fmt(r.rmse, 3));
+    setLast('fv', 'fv', { V0: r.V0, F0: r.F0, Pmax: r.P, RFmax: r.RFmax, DRF: r.DRF });
+    const w = [];
+    if (pts.length < 4) w.push('Moins de 4 points : le modèle est peu contraint.');
+    if (r.rmse > 0.15) w.push('Erreur du modèle élevée : vérifie les temps saisis.');
+    if (r.vmax < 4 || r.vmax > 13) w.push('Vitesse max hors plage plausible.');
+    setText('fvWarn', w.join(' '));
+    const fvRel = r.fh.map(f => f / m);
+    const reg = linReg(r.v, fvRel);
+    const vv = r.v[r.v.length - 1];
+    showChart('fvChart', 'Force horizontale (N/kg) selon la vitesse (m/s)', {
+        xmin: 0, xmax: r.V0, ymin: 0, ymax: r.F0 * 1.05,
+        xticks: niceTicks(0, r.V0, 5).filter(x => x <= r.V0).map(x => ({ x: x, label: String(x) })),
+        series: [
+            { type: 'dots', color: '#9bbcff', pts: r.v.filter((_, i) => i % 8 === 0).map((x, i) => ({ x: x, y: fvRel[i * 8] })) },
+            { type: 'line', color: '#d9534f', pts: [{ x: 0, y: reg.intercept }, { x: r.V0, y: 0 }] }
+        ], xlabel: 'Vitesse (m/s)', ylabel: 'N/kg'
+    });
+}
+
+function calculSauts() {
+    const ids = ['cmjH','cmjV','cmjPeak','cmjPeakRel','cmjMean'];
+    setText('cmjWarn', ''); setLast('cmj', 'cmj', null);
+    const m = val('cmjMasse'), x = val('cmjVal'), mode = document.getElementById('cmjMode').value;
+    if (isNaN(m) || isNaN(x) || m <= 0 || x <= 0) { clearIds(ids); }
+    else {
+        const h = mode === 'h' ? x : jumpHeightFromFlight(x);
+        const r = cmjCalc(m, h);
+        setText('cmjH', fmt(h, 1)); setText('cmjV', fmt(r.v, 2));
+        setText('cmjPeak', fmt(r.peak, 0)); setText('cmjPeakRel', fmt(r.peak / m, 1)); setText('cmjMean', fmt(r.mean, 0));
+        setLast('cmj', 'cmj', { H: h, V: r.v, Ppic: r.peak });
+        if (h > 90) setText('cmjWarn', 'Hauteur très élevée : vérifie l\'unité (cm ou ms).');
+    }
+    setLast('bj', 'bj', null);
+    const d = val('bjDist'), t = val('bjTaille'), a = val('bjAngle');
+    if (isNaN(d) || d <= 0) { clearIds(['bjRatio','bjV']); setText('bjWarn', ''); return; }
+    const b = broadCalc(d, t, isNaN(a) ? 25 : a);
+    setText('bjRatio', isNaN(b.ratio) ? '-' : fmt(b.ratio, 2));
+    setText('bjV', fmt(b.v, 2));
+    setLast('bj', 'bj', { Dist: d, Ratio: b.ratio });
+    setText('bjWarn', d < 80 || d > 400 ? 'Distance hors plage habituelle : vérifie l\'unité (cm).' : '');
+}
+
+function calculRSI() {
+    setText('rsiWarn', ''); setLast('rsi', 'rsi', null);
+    const x = val('rsiVal'), c = val('rsiContact'), mode = document.getElementById('rsiMode').value;
+    if (isNaN(x) || isNaN(c) || x <= 0 || c <= 0) { clearIds(['rsiH','rsiRes']); return; }
+    const hCm = mode === 'h' ? x : jumpHeightFromFlight(x);
+    const rsi = (hCm / 100) / (c / 1000);
+    setText('rsiH', fmt(hCm, 1)); setText('rsiRes', fmt(rsi, 2));
+    setLast('rsi', 'rsi', { RSI: rsi, Contact: c, H: hCm });
+    const w = [];
+    if (c > 400) w.push('Contact > 400 ms : ce n\'est plus un drop jump réactif.');
+    if (c < 80) w.push('Contact très court : vérifie l\'unité (ms).');
+    if (hCm > 90) w.push('Hauteur très élevée : vérifie l\'unité.');
+    setText('rsiWarn', w.join(' '));
+}
+
+function calculAdv() {
+    // RSImod
+    setText('rmdWarn', ''); setLast('rsimod', 'rsimod', null);
+    const x = val('rmdVal'), tt = val('rmdT'), mode = document.getElementById('rmdMode').value;
+    if (isNaN(x) || isNaN(tt) || x <= 0 || tt <= 0) clearIds(['rmdH', 'rmdRes']);
+    else {
+        const h = mode === 'h' ? x : jumpHeightFromFlight(x), r = rsimodCalc(h, tt);
+        setText('rmdH', fmt(h, 1)); setText('rmdRes', fmt(r, 2));
+        setLast('rsimod', 'rsimod', { RSImod: r, H: h, Tdec: tt });
+        if (tt < 300) setText('rmdWarn', 'Temps de décollage très court : vérifie l\'unité (ms).');
+    }
+    // EUR
+    setText('eurWarn', ''); setLast('eur', 'eur', null);
+    const c = val('eurCmj'), s = val('eurSj');
+    if (isNaN(c) || isNaN(s) || c <= 0 || s <= 0) clearIds(['eurRes', 'eurElast']);
+    else {
+        const r = eurCalc(c, s);
+        setText('eurRes', fmt(r.eur, 2)); setText('eurElast', fmt(r.elast, 1));
+        setLast('eur', 'eur', { EUR: r.eur, Elast: r.elast });
+        if (r.eur < 0.95) setText('eurWarn', 'CMJ nettement inférieur au SJ : vérifie la technique ou les valeurs.');
+    }
+    // Asymétrie
+    setText('asymWarn', ''); setLast('asym', 'asym', null);
+    const a = val('asymL'), b = val('asymR');
+    if (isNaN(a) || isNaN(b) || a <= 0 || b <= 0) clearIds(['asymVal', 'asymWeak', 'asymLsi']);
+    else {
+        const r = asymCalc(a, b);
+        setText('asymVal', fmt(r.asym, 1)); setText('asymWeak', r.weaker); setText('asymLsi', fmt(r.lsi, 1));
+        setLast('asym', 'asym', { Asym: r.asym, LSI: r.lsi });
+    }
+    // 1RM
+    setText('rmWarn', ''); setLast('rm', 'rm', null);
+    const w = val('rmLoad'), reps = val('rmReps');
+    if (isNaN(w) || isNaN(reps) || w <= 0 || reps < 1 || reps > 15 || reps !== Math.round(reps)) {
+        clearIds(['rmMean', 'rmEpley', 'rmBrz', 'rmLom']); setText('rmTable', '-');
+        if (!isNaN(reps) && (reps > 15 || reps < 1 || reps !== Math.round(reps))) setText('rmWarn', 'Répétitions : entier entre 1 et 15.');
+    } else {
+        const r = rmCalc(w, reps);
+        setText('rmMean', fmt(r.mean, 1)); setText('rmEpley', fmt(r.epley, 1)); setText('rmBrz', fmt(r.brzycki, 1)); setText('rmLom', fmt(r.lombardi, 1));
+        setText('rmTable', [95, 90, 85, 80, 75, 70, 60].map(p => p + ' % : ' + fmt(r.mean * p / 100, 1) + ' kg').join(' · '));
+        setLast('rm', 'rm', { Moy: r.mean, Epley: r.epley, Brzycki: r.brzycki });
+        if (reps > 10) setText('rmWarn', 'Au-delà de 10 répétitions, l\'estimation est peu fiable ; privilégie une série de 2 à 6 répétitions.');
+    }
+}
+
+function calcAll() { calculRast(); calculRsa(); calculFV(); calculSauts(); calculRSI(); calculAdv(); videoCompute(); }
+
+/* ---------- Stockage local ---------- */
+function lsGet(key, def) { try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : def; } catch (e) { return def; } }
+function lsSet(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); return true; } catch (e) { return false; } }
+
+/* ---------- Profil athlète ---------- */
+const MASS_IDS = ['poidsRast', 'fvMasse', 'cmjMasse'], HEIGHT_IDS = ['fvTaille', 'bjTaille'];
+function athName() { return document.getElementById('pNom').value.trim() || 'Sans nom'; }
+function refreshAthLists() {
+    const ath = lsGet('perf_athletes', {});
+    document.getElementById('athList').innerHTML = Object.keys(ath).map(n => '<option value="' + esc(n) + '"></option>').join('');
+    renderHistory(true);
+}
+function propagateProfile() {
+    const m = document.getElementById('pMasse').value, h = document.getElementById('pTaille').value;
+    if (m !== '') MASS_IDS.forEach(id => { document.getElementById(id).value = m; });
+    if (h !== '') HEIGHT_IDS.forEach(id => { document.getElementById(id).value = h; });
+    calcAll();
+}
+function flash(id, msg) { setText(id, msg); setTimeout(() => setText(id, ''), 2500); }
+
+/* ---------- Historique ---------- */
+const TESTS = {
+    rast: { label: 'RAST', m: { Pmax: ['P max (W)', 0], Pmoy: ['P moy (W)', 0], FI: ['Fatigue (W/s)', 2], Baisse: ['Baisse (%)', 1] } },
+    rsa:  { label: 'Sprints répétés', m: { Sdec: ['Sdec (%)', 2], Total: ['Total (s)', 2], Meilleur: ['Meilleur (s)', 2] } },
+    fv:   { label: 'Profil F-V', m: { V0: ['V0 (m/s)', 2], F0: ['F0 (N/kg)', 2], Pmax: ['Pmax (W/kg)', 1], RFmax: ['RFmax (%)', 1], DRF: ['DRF', 2] } },
+    cmj:  { label: 'CMJ', m: { H: ['Hauteur (cm)', 1], V: ['Vitesse (m/s)', 2], Ppic: ['P pic (W)', 0] } },
+    bj:   { label: 'Broad jump', m: { Dist: ['Distance (cm)', 0], Ratio: ['Dist./taille', 2] } },
+    rsi:  { label: 'RSI', m: { RSI: ['RSI (m/s)', 2], Contact: ['Contact (ms)', 0], H: ['Hauteur (cm)', 1] } },
+    rsimod: { label: 'RSImod', m: { RSImod: ['RSImod (m/s)', 2], H: ['Hauteur (cm)', 1], Tdec: ['Décollage (ms)', 0] } },
+    eur:  { label: 'EUR CMJ/SJ', m: { EUR: ['EUR', 2], Elast: ['Élasticité (%)', 1] } },
+    asym: { label: 'Asymétrie G/D', m: { Asym: ['Asymétrie (%)', 1], LSI: ['LSI (%)', 1] } },
+    rm:   { label: '1RM estimé', m: { Moy: ['1RM moy. (kg)', 1], Epley: ['Epley (kg)', 1], Brzycki: ['Brzycki (kg)', 1] } }
+};
+
+function saveResult(key) {
+    const cur = LAST[key];
+    if (!cur) { flash('saved-' + key, 'Rien à enregistrer'); return; }
+    const hist = lsGet('perf_history', []);
+    hist.push({ id: Date.now() + '-' + Math.random().toString(36).slice(2, 7), ts: new Date().toISOString(),
+                athlete: athName(), test: cur.test, src: key === 'vid' ? 'vidéo' : 'manuel', v: cur.v });
+    if (lsSet('perf_history', hist)) { flash('saved-' + key, 'Enregistré ✓'); renderHistory(true); }
+    else flash('saved-' + key, 'Sauvegarde impossible dans ce navigateur');
+}
+
+function fillSelect(id, opts, keep) {
+    const el = document.getElementById(id), prev = el.value;
+    el.innerHTML = opts.map(o => '<option value="' + esc(o[0]) + '">' + esc(o[1]) + '</option>').join('');
+    if (keep && opts.some(o => o[0] === prev)) el.value = prev;
+}
+
+function renderHistory(rebuildSelects) {
+    const hist = lsGet('perf_history', []);
+    if (rebuildSelects) {
+        fillSelect('hTest', Object.keys(TESTS).map(k => [k, TESTS[k].label]), true);
+        const names = Array.from(new Set(hist.map(e => e.athlete).concat([athName()]))).sort();
+        const elA = document.getElementById('hAth'), prevA = elA.value;
+        fillSelect('hAth', names.map(n => [n, n]), false);
+        elA.value = names.indexOf(prevA) >= 0 && prevA !== athName() ? prevA : athName();
+    }
+    const test = document.getElementById('hTest').value || 'rast';
+    const metrics = TESTS[test].m, mk = Object.keys(metrics);
+    const elM = document.getElementById('hMetric'), prevM = elM.value;
+    fillSelect('hMetric', mk.map(k => [k, metrics[k][0]]), false);
+    elM.value = mk.indexOf(prevM) >= 0 ? prevM : mk[0];
+    const metric = elM.value, ath = document.getElementById('hAth').value;
+    const rows = hist.filter(e => e.test === test && e.athlete === ath).sort((a, b) => a.ts < b.ts ? -1 : 1);
+    setText('histoWho', 'Historique : ' + ath + ' · ' + TESTS[test].label + ' (' + rows.length + ' enregistrement' + (rows.length > 1 ? 's' : '') + ')');
+    let html = '<tr><th>Date</th>' + mk.map(k => '<th>' + esc(metrics[k][0]) + '</th>').join('') + '<th>Δ ' + esc(metric) + '</th><th></th></tr>';
+    let prev = null;
+    rows.forEach(e => {
+        const x = e.v[metric];
+        let delta = '-';
+        if (prev != null && isFinite(x) && prev !== 0) { const d = (x - prev) / Math.abs(prev) * 100; delta = (d >= 0 ? '+' : '') + d.toFixed(1) + ' %'; }
+        if (isFinite(x)) prev = x;
+        html += '<tr><td>' + esc(e.ts.slice(0, 10)) + (e.src === 'vidéo' ? ' 🎥' : '') + '</td>' +
+            mk.map(k => '<td>' + fmt(e.v[k], metrics[k][1]) + '</td>').join('') + '<td>' + delta + '</td>' +
+            '<td><button class="btn danger" style="padding:2px 6px" data-del="' + esc(e.id) + '">✕</button></td></tr>';
+    });
+    document.getElementById('hTable').innerHTML = rows.length ? html : '';
+    const pts = rows.map((e, i) => ({ x: i, y: e.v[metric], d: e.ts.slice(5, 10) })).filter(p => isFinite(p.y));
+    if (pts.length >= 2) {
+        const rg = padRange(pts.map(p => p.y)), step = Math.ceil(pts.length / 5);
+        showChart('hChart', metrics[metric][0] + ' au fil du temps', {
+            xmin: -0.5, xmax: pts.length - 0.5, ymin: rg[0], ymax: rg[1],
+            xticks: pts.filter((_, i) => i % step === 0).map(p => ({ x: p.x, label: p.d })),
+            series: [{ type: 'dotline', pts: pts }]
+        });
+    } else showChart('hChart', '', null);
+}
+
+function exportCsv() {
+    const hist = lsGet('perf_history', []);
+    if (!hist.length) { flash('hMsg', 'Aucune donnée'); return; }
+    const lines = ['date;athlete;test;source;indicateur;valeur'];
+    hist.slice().sort((a, b) => a.ts < b.ts ? -1 : 1).forEach(e => {
+        Object.keys(e.v).forEach(k => {
+            if (!isFinite(e.v[k])) return;
+            const name = TESTS[e.test] && TESTS[e.test].m[k] ? TESTS[e.test].m[k][0] : k;
+            lines.push([e.ts.slice(0, 16).replace('T', ' '), e.athlete, TESTS[e.test] ? TESTS[e.test].label : e.test, e.src || '', name,
+                        String(Math.round(e.v[k] * 1000) / 1000).replace('.', ',')].map(s => '"' + String(s).replace(/"/g, '""') + '"').join(';'));
+        });
+    });
+    const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'tests_performance.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+/* ---------- Onglet vidéo ---------- */
+const VID = { frame: 0, n: 0, marks: [null, null, null], url: null, raf: null };
+function vidEl() { return document.getElementById('vid'); }
+function fileFps() { const f = val('vidFileFps'); return f > 0 ? f : NaN; }
+function capFps() { const f = val('vidCapFps'); return f > 0 ? f : NaN; }
+function vidMode() { return document.getElementById('vidMode').value; }
+function vidLabels() {
+    const m = vidMode();
+    if (m === 'cmj') return ['Décollage', 'Atterrissage'];
+    if (m === 'rsimod') return ['Début du mouvement', 'Décollage', 'Atterrissage'];
+    return ['Impact au sol', 'Décollage', 'Atterrissage'];
+}
+
+function vidUpdateInfo() {
+    const f = fileFps();
+    if (!VID.url) { setText('vidInfo', 'Aucune vidéo chargée.'); return; }
+    setText('vidInfo', 'Image ' + VID.frame + ' / ' + Math.max(0, VID.n - 1) + (isFinite(f) ? ' · t = ' + (VID.frame / f).toFixed(3) + ' s (fichier)' : ''));
+    document.getElementById('vidSlider').value = VID.frame;
+}
+function vidSeek(f) {
+    const fps = fileFps();
+    if (!VID.url || !isFinite(fps) || VID.n < 1) return;
+    VID.frame = Math.max(0, Math.min(VID.n - 1, Math.round(f)));
+    vidEl().currentTime = (VID.frame + 0.5) / fps; // milieu de l'image
+    vidUpdateInfo();
+}
+function vidRecount() {
+    const v = vidEl(), fps = fileFps();
+    VID.n = (isFinite(v.duration) && isFinite(fps)) ? Math.floor(v.duration * fps) : 0;
+    const sl = document.getElementById('vidSlider'); sl.max = Math.max(0, VID.n - 1);
+    vidSeek(Math.min(VID.frame, Math.max(0, VID.n - 1)));
+}
+function vidRenderMarks() {
+    const labs = vidLabels();
+    let html = '';
+    labs.forEach((lab, i) => {
+        const f = VID.marks[i], fps = fileFps();
+        html += '<div class="markrow"><button class="btn" data-mark="' + i + '">Marquer</button>' +
+                '<span class="t">' + (i + 1) + '. ' + esc(lab) + ' : ' + (f == null ? '-' : 'image ' + f + (isFinite(fps) ? ' (' + (f / fps).toFixed(3) + ' s)' : '')) + '</span>' +
+                '<button class="btn sec" data-goto="' + i + '"' + (f == null ? ' disabled' : '') + '>Aller</button>' +
+                '<button class="btn danger" data-clear="' + i + '"' + (f == null ? ' disabled' : '') + '>✕</button></div>';
+    });
+    document.getElementById('vidMarks').innerHTML = html;
+}
+function videoCompute() {
+    const ids = ['vidR1', 'vidR2', 'vidR3', 'vidR4'];
+    ids.forEach(i => setText(i, '-')); setText('vidWarn', ''); setLast('vid', 'cmj', null);
+    const cap = capFps(), mode = vidMode();
+    if (!isFinite(cap)) { setText('vidWarn', 'Renseigne la fréquence de capture.'); return; }
+    const r = videoCalc(mode, VID.marks, cap);
+    if (!r) { setText('vidR1', 'Place les marques dans l\'ordre chronologique pour obtenir le résultat.'); return; }
+    const w = [];
+    if (mode === 'rsimod') {
+        setText('vidR1', 'Temps de décollage : ' + fmt(r.tto, 0) + ' ms');
+        setText('vidR2', 'Temps de vol : ' + fmt(r.flight, 0) + ' ms → hauteur ' + fmt(r.h, 1) + ' cm  (± ' + fmt(r.errH, 0) + ' %)');
+        setText('vidR3', 'RSImod : ' + fmt(r.rsimod, 2) + ' m/s');
+        setLast('vid', 'rsimod', { RSImod: r.rsimod, H: r.h, Tdec: r.tto });
+        if (r.h > 90 || r.h < 3) w.push('Hauteur invraisemblable : vérifie les fréquences et les marques.');
+        if (r.tto < 300) w.push('Temps de décollage très court : le début du mouvement est-il bien marqué ?');
+    } else if (mode === 'cmj') {
+        setText('vidR1', 'Temps de vol : ' + fmt(r.flight, 0) + ' ms');
+        setText('vidR2', 'Hauteur de saut : ' + fmt(r.h, 1) + ' cm  (± ' + fmt(r.errH, 0) + ' %)');
+        const m = val('cmjMasse'), v = Math.sqrt(2 * G * r.h / 100);
+        const data = { H: r.h, V: v };
+        setText('vidR3', 'Vitesse de décollage : ' + fmt(v, 2) + ' m/s');
+        if (m > 0) { const c = cmjCalc(m, r.h); data.Ppic = c.peak; setText('vidR4', 'Puissance pic (Sayers) : ' + fmt(c.peak, 0) + ' W'); }
+        else setText('vidR4', 'Renseigne la masse de l\'athlète pour la puissance estimée.');
+        setLast('vid', 'cmj', data);
+        if (r.h > 90 || r.h < 3) w.push('Hauteur invraisemblable : vérifie les fréquences et les marques.');
+    } else {
+        setText('vidR1', 'Contact au sol : ' + fmt(r.contact, 0) + ' ms  (± ' + fmt(r.errC, 0) + ' %)');
+        setText('vidR2', 'Temps de vol : ' + fmt(r.flight, 0) + ' ms → hauteur ' + fmt(r.h, 1) + ' cm  (± ' + fmt(r.errH, 0) + ' %)');
+        setText('vidR3', 'RSI : ' + fmt(r.rsi, 2) + ' m/s');
+        setLast('vid', 'rsi', { RSI: r.rsi, Contact: r.contact, H: r.h });
+        if (r.contact > 400) w.push('Contact > 400 ms : ce n\'est plus un drop jump réactif.');
+        if (r.h > 90 || r.h < 3) w.push('Hauteur invraisemblable : vérifie les fréquences et les marques.');
+    }
+    if (r.dt > 10) w.push('Résolution de ' + fmt(r.dt, 1) + ' ms par image : mesure peu précise, préfère 120 img/s ou plus.');
+    setText('vidWarn', w.join(' '));
+}
+function vidPlayToggle() {
+    const v = vidEl();
+    if (!VID.url) return;
+    if (v.paused) {
+        v.playbackRate = 0.25; v.play();
+        const loop = () => {
+            if (v.paused) { VID.frame = Math.min(VID.n - 1, Math.max(0, Math.floor(v.currentTime * fileFps()))); vidUpdateInfo(); VID.raf = null; return; }
+            VID.frame = Math.min(VID.n - 1, Math.max(0, Math.floor(v.currentTime * fileFps()))); vidUpdateInfo();
+            VID.raf = requestAnimationFrame(loop);
+        };
+        VID.raf = requestAnimationFrame(loop);
+        setText('vidPlay', 'Pause');
+    } else { v.pause(); setText('vidPlay', 'Lecture ralentie'); }
+}
+
+/* ---------- Détection automatique (MediaPipe Pose) ---------- */
+const AUTO = { running: false, cancel: false, lm: null };
+const MP_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+const MP_MODEL = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+function autoStatus(t) { setText('autoStatus', t); }
+function autoButtons(running) {
+    document.getElementById('autoRun').disabled = running;
+    document.getElementById('autoCancel').disabled = !running;
+}
+async function autoLoad() {
+    if (AUTO.lm) return AUTO.lm;
+    autoStatus('Chargement du modèle (Internet requis la première fois)…');
+    const mod = await import(MP_BASE + '/vision_bundle.mjs');
+    const vision = await mod.FilesetResolver.forVisionTasks(MP_BASE + '/wasm');
+    const make = delegate => mod.PoseLandmarker.createFromOptions(vision, {
+        baseOptions: { modelAssetPath: MP_MODEL, delegate: delegate }, runningMode: 'IMAGE', numPoses: 1
+    });
+    try { AUTO.lm = await make('GPU'); } catch (e) { AUTO.lm = await make('CPU'); }
+    return AUTO.lm;
+}
+function vidSeekAsync(f) {
+    return new Promise(res => {
+        const v = vidEl(), target = (f + 0.5) / fileFps();
+        if (Math.abs(v.currentTime - target) < 1e-6) { res(); return; }
+        let done = false;
+        const fin = () => { if (done) return; done = true; v.removeEventListener('seeked', fin); requestAnimationFrame(() => res()); };
+        v.addEventListener('seeked', fin);
+        setTimeout(fin, 1500);
+        v.currentTime = target;
+    });
+}
+/* Points utilisés : chevilles (27, 28), talons (29, 30), pointes de pieds (31, 32) ; hanches (23, 24) pour l'échelle */
+function poseFootSample(p) {
+    const ok = i => p[i] && (p[i].visibility === undefined || p[i].visibility >= 0.2);
+    let y = NaN;
+    [27, 28, 29, 30, 31, 32].forEach(i => { if (ok(i) && !(y >= p[i].y)) y = p[i].y; });
+    let leg = NaN;
+    if (ok(23) && ok(24) && ok(27) && ok(28)) leg = (p[27].y + p[28].y) / 2 - (p[23].y + p[24].y) / 2;
+    return { y: y, leg: leg };
+}
+async function autoRunPose() {
+    if (AUTO.running) return;
+    const fps = fileFps(), cap = capFps();
+    if (!VID.url || VID.n < 10) { autoStatus('Charge d\'abord une vidéo.'); return; }
+    if (!isFinite(fps) || !isFinite(cap)) { autoStatus('Renseigne les fréquences du fichier et de capture.'); return; }
+    let a = Math.round(val('autoFrom')), b = Math.round(val('autoTo'));
+    if (!isFinite(a)) a = 0;
+    if (!isFinite(b)) b = VID.n - 1;
+    a = Math.max(0, a); b = Math.min(VID.n - 1, b);
+    const thrPct = val('autoThr');
+    if (b - a < 10) { autoStatus('Plage d\'images trop courte.'); return; }
+    if (!(thrPct > 0 && thrPct < 20)) { autoStatus('Seuil : entre 0 et 20 % de la longueur de jambe (3 par défaut).'); return; }
+    AUTO.running = true; AUTO.cancel = false; autoButtons(true);
+    try {
+        if (!vidEl().paused) vidPlayToggle();
+        const lm = await autoLoad();
+        const ys = [], legs = [];
+        for (let f = a; f <= b; f++) {
+            if (AUTO.cancel) { autoStatus('Analyse annulée.'); return; }
+            await vidSeekAsync(f);
+            const res = lm.detect(vidEl());
+            const p = res && res.landmarks && res.landmarks[0];
+            const s = p ? poseFootSample(p) : { y: NaN, leg: NaN };
+            ys.push(s.y); if (isFinite(s.leg) && s.leg > 0) legs.push(s.leg);
+            if ((f - a) % 5 === 0) autoStatus('Analyse… ' + Math.round((f - a) / (b - a) * 100) + ' % (image ' + f + ')');
+        }
+        const L = legs.length ? median(legs) : NaN;
+        const mode = vidMode() === 'rsi' ? 'rsi' : 'cmj';
+        const r = detectJumpMarks(ys, L, cap, mode, thrPct / 100);
+        if (!r.ok) {
+            showAutoChart(r, L, a, [], 'de la jambe');
+            autoStatus(r.notes[0] + (r.notes[0].indexOf('70 %') >= 0 ? ' Si seules les jambes sont visibles, choisis la méthode « Suivi d\'un point du pied ».' : ''));
+            return;
+        }
+        const abs = applyAutoMarks(r.marks, a);
+        showAutoChart(r, L, a, abs, 'de la jambe');
+        autoStatus('Marques proposées : vérifie chacune avec « Aller » et corrige-la à la main si besoin.' +
+            (cap < 100 ? ' Attention : sous 100 img/s la détection est peu précise (biais de plusieurs dizaines de ms).' : ''));
+    } catch (e) {
+        autoStatus('Échec de la détection : ' + (e && e.message ? e.message : e) + ' — vérifie ta connexion Internet (chargement du modèle) ou pointe les marques à la main.');
+    } finally {
+        AUTO.running = false; autoButtons(false);
+    }
+}
+
+function applyAutoMarks(marks, a) {
+    const abs = marks.map(m => Math.max(0, Math.min(VID.n - 1, a + m)));
+    if (vidMode() === 'cmj') { VID.marks[0] = abs[0]; VID.marks[1] = abs[1]; }
+    else if (vidMode() === 'rsimod') { VID.marks[1] = abs[0]; VID.marks[2] = abs[1]; }
+    else { VID.marks[0] = abs[0]; VID.marks[1] = abs[1]; VID.marks[2] = abs[2]; }
+    vidRenderMarks(); videoCompute();
+    vidSeek(abs[0]);
+    return abs;
+}
+
+/* Graphique du signal analysé : hauteur du pied (en % de l'échelle), seuil en gris, marques en rouge */
+function showAutoChart(r, scale, a, marksAbs, unit) {
+    if (!r || !r.y || !(scale > 0)) { showChart('autoChart', '', null); return; }
+    const hts = r.y.map(v => (r.g - v) / scale * 100);
+    const lo = Math.min(0, ...hts), hi = Math.max(...hts) * 1.05 || 1, thrP = r.thr / scale * 100, b = a + hts.length - 1;
+    const series = [
+        { type: 'line', color: '#007bff', pts: hts.map((v, i) => ({ x: a + i, y: v })) },
+        { type: 'line', color: '#aaaaaa', pts: [{ x: a, y: thrP }, { x: b, y: thrP }] }
+    ];
+    (marksAbs || []).forEach(m => series.push({ type: 'line', color: '#d9534f', pts: [{ x: m, y: lo }, { x: m, y: hi }] }));
+    showChart('autoChart', 'Hauteur du pied (% ' + unit + ') selon l\'image · gris : seuil · rouge : marques', {
+        xmin: a, xmax: b, ymin: lo, ymax: hi, series: series, xlabel: 'Image',
+        xticks: niceTicks(a, b, 5).filter(x => x >= a && x <= b).map(x => ({ x: x, label: String(Math.round(x)) }))
+    });
+}
+
+/* ---------- Suivi d'un point : interface ---------- */
+const TRK = { x: NaN, y: NaN, frame: -1, pts: {} };
+function trkCanvas() { return document.getElementById('trkCanvas'); }
+function autoMethod() { return document.getElementById('autoMethod').value; }
+function trkSetup() {
+    const v = vidEl(), c = trkCanvas();
+    if (!v.videoWidth) return;
+    c.width = Math.min(640, v.videoWidth);
+    c.height = Math.max(1, Math.round(v.videoHeight * c.width / v.videoWidth));
+    trkRefresh();
+}
+function trkRefresh() {
+    const v = vidEl(), c = trkCanvas();
+    if (autoMethod() !== 'trk' || !v.videoWidth || AUTO.running) return;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(v, 0, 0, c.width, c.height);
+    const mark = (p, color) => { ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, 8, 0, 6.2832); ctx.stroke(); ctx.strokeRect(p.x - 12, p.y - 12, 25, 25); };
+    if (TRK.frame === VID.frame && isFinite(TRK.x)) mark({ x: TRK.x, y: TRK.y }, '#ffd400');
+    else if (TRK.pts[VID.frame]) mark(TRK.pts[VID.frame], '#33ff66');
+}
+async function trkGrab(f) {
+    await vidSeekAsync(f);
+    const c = trkCanvas(), ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(vidEl(), 0, 0, c.width, c.height);
+    return grayFromRGBA(ctx.getImageData(0, 0, c.width, c.height).data, c.width * c.height);
+}
+function trkPick(ev) {
+    if (!VID.url || !vidEl().videoWidth) return;
+    const c = trkCanvas(), rc = c.getBoundingClientRect();
+    TRK.x = (ev.clientX - rc.left) * c.width / rc.width;
+    TRK.y = (ev.clientY - rc.top) * c.height / rc.height;
+    TRK.frame = VID.frame; TRK.pts = {};
+    setText('trkInfo', 'Point choisi à l\'image ' + VID.frame + '. Lance « Détecter les marques ».');
+    trkRefresh();
+}
+async function autoRunTrack() {
+    if (AUTO.running) return;
+    const fps = fileFps(), cap = capFps();
+    if (!VID.url || VID.n < 10) { autoStatus('Charge d\'abord une vidéo.'); return; }
+    if (!isFinite(fps) || !isFinite(cap)) { autoStatus('Renseigne les fréquences du fichier et de capture.'); return; }
+    if (!isFinite(TRK.x)) { autoStatus('Touche d\'abord l\'image (bout de la chaussure) pour choisir le point à suivre.'); return; }
+    let a = Math.round(val('autoFrom')), b = Math.round(val('autoTo'));
+    if (!isFinite(a)) a = 0;
+    if (!isFinite(b)) b = VID.n - 1;
+    a = Math.max(0, a); b = Math.min(VID.n - 1, b);
+    const thrPct = val('autoThr'), s = TRK.frame;
+    if (b - a < 10) { autoStatus('Plage d\'images trop courte.'); return; }
+    if (s < a || s > b) { autoStatus('L\'image où tu as choisi le point (' + s + ') doit être comprise dans la plage d\'analyse.'); return; }
+    if (!(thrPct > 0 && thrPct < 40)) { autoStatus('Seuil : entre 0 et 40 % de l\'amplitude (8 par défaut).'); return; }
+    AUTO.running = true; AUTO.cancel = false; autoButtons(true);
+    try {
+        if (!vidEl().paused) vidPlayToggle();
+        const c = trkCanvas(), w = c.width, h = c.height;
+        const g0 = await trkGrab(s);
+        const tr0 = makeTracker(g0, w, h, TRK.x, TRK.y, 12);
+        if (patchContrast(tr0.tpl) < 8) { autoStatus('Point trop uniforme (peu de contraste) : choisis le bout de la chaussure, un lacet ou un scotch de couleur.'); return; }
+        const total = b - a + 1, ys = new Array(total).fill(NaN), pts = {};
+        let done = 0, bad = 0;
+        ys[s - a] = tr0.y; pts[s] = { x: tr0.x, y: tr0.y };
+        const run = async (start, end, step) => {
+            const tr = cloneTracker(tr0);
+            for (let f = start; step > 0 ? f <= end : f >= end; f += step) {
+                if (AUTO.cancel) return false;
+                const r = trackFrame(tr, await trkGrab(f), w, h);
+                ys[f - a] = r.y; pts[f] = { x: r.x, y: r.y };
+                if (r.sad > 15) bad++;
+                if (++done % 5 === 0) autoStatus('Suivi… ' + Math.round(done / total * 100) + ' % (image ' + f + ')');
+            }
+            return true;
+        };
+        if (!(await run(s + 1, b, 1)) || !(await run(s - 1, a, -1))) { autoStatus('Analyse annulée.'); return; }
+        TRK.pts = pts;
+        const A = signalScale(ys, cap);
+        const mode = vidMode() === 'rsi' ? 'rsi' : 'cmj';
+        const r = detectJumpMarks(ys, A, cap, mode, thrPct / 100);
+        const badPct = bad / Math.max(1, total - 1) * 100;
+        const warn = (badPct > 10 ? ' Suivi peu fiable sur ' + Math.round(badPct) + ' % des images : choisis un point plus contrasté.' : '') +
+                     (cap < 100 ? ' Attention : sous 100 img/s la détection est peu précise (biais de plusieurs dizaines de ms).' : '');
+        if (!r.ok) { showAutoChart(r, A, a, [], 'de l\'amplitude'); autoStatus(r.notes[0] + warn); return; }
+        const abs = applyAutoMarks(r.marks, a);
+        showAutoChart(r, A, a, abs, 'de l\'amplitude');
+        autoStatus('Marques proposées : vérifie chacune avec « Aller » (le point suivi apparaît en vert) et corrige-la à la main si besoin.' + warn);
+    } catch (e) {
+        autoStatus('Échec du suivi : ' + (e && e.message ? e.message : e));
+    } finally {
+        AUTO.running = false; autoButtons(false); trkRefresh();
+    }
+}
+function autoRun() { return autoMethod() === 'pose' ? autoRunPose() : autoRunTrack(); }
+function autoMethodChanged() {
+    const pose = autoMethod() === 'pose';
+    document.getElementById('trkBlock').style.display = pose ? 'none' : 'block';
+    document.getElementById('poseNote').style.display = pose ? 'block' : 'none';
+    setText('autoThrLabel', pose ? 'Seuil (% jambe)' : 'Seuil (% amplitude)');
+    document.getElementById('autoThr').value = pose ? '3' : '8';
+    showChart('autoChart', '', null);
+    if (!pose) trkSetup();
+}
+
+/* ---------- Initialisation ---------- */
+function buildInputs() {
+    let html = '';
+    for (let i = 1; i <= 10; i++) html += '<div class="input-group"><label>Sprint ' + i + ' (s)</label><input type="text" inputmode="decimal" id="s' + i + '"></div>';
+    document.getElementById('rsaInputs').innerHTML = html;
+
+    const dist = [5, 10, 15, 20, 25, 30, 35, 40];
+    html = '';
+    for (let i = 1; i <= 8; i++) {
+        html += '<div class="row2"><div class="input-group"><label>Distance (m)</label><input type="text" inputmode="decimal" id="fvD' + i + '" value="' + dist[i - 1] + '"></div>' +
+                '<div class="input-group"><label>Temps (s)</label><input type="text" inputmode="decimal" id="fvT' + i + '"></div></div>';
+    }
+    document.getElementById('fvPoints').innerHTML = html;
+}
+
+function switchTab(tabId) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
+    document.getElementById(tabId).classList.add('active');
+    if (tabId === 'histo') renderHistory(true);
+    if (tabId !== 'video' && VID.url && !vidEl().paused) vidPlayToggle();
+}
+
+if (typeof document !== 'undefined' && document.getElementById('rast')) {
+    buildInputs();
+    document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+    const bind = (ids, fn) => ids.forEach(id => document.getElementById(id).addEventListener('input', fn));
+    bind(['poidsRast','r1','r2','r3','r4','r5','r6'], calculRast);
+    bind(Array.from({length: 10}, (_, i) => 's' + (i + 1)), calculRsa);
+    bind(['fvMasse','fvTaille','fvTemp','fvPress'].concat(Array.from({length: 8}, (_, i) => ['fvD' + (i + 1), 'fvT' + (i + 1)]).flat()), calculFV);
+    bind(['cmjMasse','cmjVal','bjDist','bjTaille','bjAngle'], calculSauts);
+    document.getElementById('cmjMode').addEventListener('change', () => {
+        document.getElementById('cmjLabel').textContent = document.getElementById('cmjMode').value === 'h' ? 'Hauteur CMJ (cm)' : 'Temps de vol (ms)';
+        calculSauts();
+    });
+    bind(['rsiVal','rsiContact'], calculRSI);
+    document.getElementById('rsiMode').addEventListener('change', () => {
+        document.getElementById('rsiLabel').textContent = document.getElementById('rsiMode').value === 'h' ? 'Hauteur (cm)' : 'Temps de vol (ms)';
+        calculRSI();
+    });
+
+    /* enregistrement */
+    document.querySelectorAll('[data-save]').forEach(b => b.addEventListener('click', () => saveResult(b.dataset.save)));
+
+    /* profil */
+    document.getElementById('pNom').addEventListener('input', () => {
+        const a = lsGet('perf_athletes', {})[document.getElementById('pNom').value.trim()];
+        if (a) { document.getElementById('pMasse').value = a.masse; document.getElementById('pTaille').value = a.taille; propagateProfile(); }
+        renderHistory(true);
+    });
+    bind(['pMasse', 'pTaille'], propagateProfile);
+    document.getElementById('pSave').addEventListener('click', () => {
+        const n = document.getElementById('pNom').value.trim();
+        if (!n) { flash('pMsg', 'Entre un nom'); return; }
+        const ath = lsGet('perf_athletes', {});
+        ath[n] = { masse: document.getElementById('pMasse').value, taille: document.getElementById('pTaille').value };
+        flash('pMsg', lsSet('perf_athletes', ath) ? 'Athlète enregistré ✓' : 'Sauvegarde impossible dans ce navigateur');
+        refreshAthLists();
+    });
+    document.getElementById('pDel').addEventListener('click', () => {
+        const n = document.getElementById('pNom').value.trim(), ath = lsGet('perf_athletes', {});
+        if (!n || !ath[n]) { flash('pMsg', 'Athlète inconnu'); return; }
+        if (!confirm('Supprimer le profil de ' + n + ' ? (son historique est conservé)')) return;
+        delete ath[n]; lsSet('perf_athletes', ath);
+        flash('pMsg', 'Supprimé'); refreshAthLists();
+    });
+
+    /* historique */
+    ['hTest', 'hMetric', 'hAth'].forEach(id => document.getElementById(id).addEventListener('change', () => renderHistory(false)));
+    document.getElementById('hTest').addEventListener('change', () => renderHistory(false));
+    document.getElementById('hTable').addEventListener('click', ev => {
+        const id = ev.target && ev.target.dataset ? ev.target.dataset.del : null;
+        if (!id || !confirm('Supprimer cet enregistrement ?')) return;
+        lsSet('perf_history', lsGet('perf_history', []).filter(e => e.id !== id));
+        renderHistory(true);
+    });
+    document.getElementById('hCsv').addEventListener('click', exportCsv);
+
+    /* vidéo */
+    document.getElementById('vidFile').addEventListener('change', ev => {
+        const f = ev.target.files && ev.target.files[0];
+        if (!f) return;
+        if (VID.url) URL.revokeObjectURL(VID.url);
+        VID.url = URL.createObjectURL(f); VID.marks = [null, null, null]; VID.frame = 0;
+        TRK.x = NaN; TRK.y = NaN; TRK.frame = -1; TRK.pts = {}; setText('trkInfo', 'Aucun point choisi.'); showChart('autoChart', '', null);
+        vidEl().src = VID.url; vidEl().load();
+        vidRenderMarks(); videoCompute();
+    });
+    vidEl().addEventListener('loadedmetadata', () => { vidRecount(); trkSetup(); });
+    vidEl().addEventListener('seeked', trkRefresh);
+    trkCanvas().addEventListener('click', trkPick);
+    document.getElementById('autoMethod').addEventListener('change', autoMethodChanged);
+    autoMethodChanged();
+    ['vidFileFps', 'vidCapFps'].forEach(id => document.getElementById(id).addEventListener('input', () => { if (id === 'vidFileFps') vidRecount(); vidRenderMarks(); videoCompute(); }));
+    document.getElementById('vidMode').addEventListener('change', () => { VID.marks = [null, null, null]; vidRenderMarks(); videoCompute(); });
+    document.getElementById('vidSlider').addEventListener('input', ev => vidSeek(parseInt(ev.target.value, 10)));
+    document.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => {
+        if (!vidEl().paused) vidPlayToggle();
+        vidSeek(VID.frame + parseInt(b.dataset.step, 10));
+    }));
+    document.getElementById('vidPlay').addEventListener('click', vidPlayToggle);
+    document.getElementById('vidMarks').addEventListener('click', ev => {
+        const d = ev.target.dataset || {};
+        if (d.mark != null) { if (!vidEl().paused) vidPlayToggle(); VID.marks[+d.mark] = VID.frame; }
+        else if (d.goto != null) { vidSeek(VID.marks[+d.goto]); return; }
+        else if (d.clear != null) VID.marks[+d.clear] = null;
+        else return;
+        vidRenderMarks(); videoCompute();
+    });
+    document.addEventListener('keydown', ev => {
+        if (!document.getElementById('video').classList.contains('active')) return;
+        const tag = (ev.target && ev.target.tagName) || '';
+        if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+        if (ev.key === 'ArrowRight') { ev.preventDefault(); vidSeek(VID.frame + 1); }
+        if (ev.key === 'ArrowLeft') { ev.preventDefault(); vidSeek(VID.frame - 1); }
+    });
+    /* détection automatique */
+    document.getElementById('autoRun').addEventListener('click', autoRun);
+    document.getElementById('autoCancel').addEventListener('click', () => { AUTO.cancel = true; });
+    document.getElementById('autoFromCur').addEventListener('click', () => { document.getElementById('autoFrom').value = VID.frame; });
+    document.getElementById('autoToCur').addEventListener('click', () => { document.getElementById('autoTo').value = VID.frame; });
+
+    /* autres tests */
+    bind(['rmdVal', 'rmdT', 'eurCmj', 'eurSj', 'asymL', 'asymR', 'rmLoad', 'rmReps'], calculAdv);
+    document.getElementById('rmdMode').addEventListener('change', () => {
+        document.getElementById('rmdLabel').textContent = document.getElementById('rmdMode').value === 'h' ? 'Hauteur (cm)' : 'Temps de vol (ms)';
+        calculAdv();
+    });
+    vidRenderMarks();
+    refreshAthLists();
+}
+
+if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+}
+</script>
+</body>
+</html>
