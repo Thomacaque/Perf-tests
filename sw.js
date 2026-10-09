@@ -1,6 +1,6 @@
 /* Service worker : met l'application en cache pour un usage hors-ligne.
    Changer VERSION à chaque mise à jour de index.html pour forcer le rafraîchissement du cache. */
-const VERSION = 'v4';
+const VERSION='v5';
 const CACHE = 'perf-tests-' + VERSION;
 const FILES = ['./', './index.html', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './icons/apple-touch-icon.png'];

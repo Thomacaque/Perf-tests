@@ -47,7 +47,27 @@
     .chart { margin-top: 10px; }
     .chart svg { background: #fafafa; border-radius: 6px; }
     .chart .ct { font-size: 0.75rem; color: #555; margin: 0 0 2px 2px; }
-    video { width: 100%; background: #000; border-radius: 6px; max-height: 320px; }
+    .vwrap { position: relative; overflow: hidden; background: #000; border-radius: 6px; line-height: 0; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+    .vwrap.zoomed { touch-action: none; cursor: grab; }
+    .vwrap.zoomed.drag { cursor: grabbing; }
+    .vwrap video { display: block; width: 100%; max-height: 320px; transform-origin: 0 0; border-radius: 0; will-change: transform; }
+    .vwrap .cross { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; border: 1px solid rgba(255,255,0,.8); border-radius: 50%; pointer-events: none; display: none; }
+    .vwrap.zoomed .cross { display: block; }
+    .zoomrow { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
+    .zoomrow input[type=range] { flex: 1; min-height: 30px; }
+    .zoomrow .zl { font-size: 0.8rem; font-weight: bold; min-width: 34px; text-align: right; }
+    .vgrid { display: block; }
+    .kbd { display: none; }
+    @media (min-width: 900px) {
+        body { max-width: 1180px; padding: 18px 24px; }
+        .tab-btn { font-size: 0.95rem; }
+        .section:not(#video) { max-width: 680px; margin-left: auto; margin-right: auto; }
+        .vgrid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); gap: 20px; align-items: start; }
+        .vwrap video { max-height: 68vh; }
+        .vright { position: sticky; top: 10px; }
+        .kbd { display: block; }
+        .btn { min-height: 36px; }
+    }
     table.hist { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
     table.hist th, table.hist td { border-bottom: 1px solid #eee; padding: 4px 3px; text-align: right; white-space: nowrap; }
     table.hist th:first-child, table.hist td:first-child { text-align: left; }
@@ -221,7 +241,10 @@
         <div class="input-group" id="vidFileWrap"><label>Images/s du fichier (vitesse de lecture)</label><input type="text" inputmode="decimal" id="vidFileFps" value="30"></div>
         <div class="input-group" id="vidDistWrap" style="display:none"><label>Distances des passages (m, séparées par des virgules)</label><input type="text" id="vidDists" value="10, 20, 30, 40"></div>
         <div class="input-group"><label>Vidéo</label><input type="file" id="vidFile" accept="video/*"></div>
-        <video id="vid" playsinline muted preload="auto"></video>
+        <div class="vgrid"><div class="vleft">
+        <div class="vwrap" id="vwrap"><video id="vid" playsinline muted preload="auto"></video><div class="cross"></div></div>
+        <div class="zoomrow"><button class="btn sec" id="zOut" aria-label="Zoom arrière">−</button><input type="range" id="zSlider" min="1" max="8" step="0.1" value="1" aria-label="Zoom"><button class="btn sec" id="zIn" aria-label="Zoom avant">+</button><span class="zl" id="zLbl">×1</span><button class="btn sec" id="zReset">1×</button></div>
+        <p class="note" style="margin-top:4px">Zoom : glisse sur l'image pour la déplacer (molette ou double-clic sur ordinateur). Place la chaussure sous le cercle jaune, puis avance image par image jusqu'au contact.</p>
         <div class="input-group" style="margin-top:6px"><input type="range" id="vidSlider" min="0" max="0" value="0" step="1"></div>
         <p class="note" id="vidInfo">Aucune vidéo chargée.</p>
         <div class="btnrow">
@@ -231,13 +254,14 @@
             <button class="btn sec" data-step="10">+10</button>
             <button class="btn sec" id="vidPlay">Lecture ralentie</button>
         </div>
-    
-        <h3>Marques</h3>
+        <p class="note kbd" style="margin-top:8px">Clavier : ← → image par image (Maj = ±10) · Espace lecture · M marquer la prochaine marque · + / − / 0 zoom.</p>
+        </div><div class="vright">
+        <h3 style="margin-top:0">Marques</h3>
         <div id="vidMarks"></div>
         <div class="result" id="vidOut"></div>
         <div class="warn" id="vidWarn"></div>
         <div class="btnrow"><button class="btn" id="vidUse" disabled>Utiliser ce résultat</button></div>
-    
+        </div></div>
         <details>
             <summary>Précision et sources</summary>
             <div class="refs">Chaque marque a une incertitude de ± 1 image, soit ± (1000 / images par seconde) ms. À 30 img/s la mesure est trop grossière ; viser 120 img/s ou plus. Sauts : hauteur = g·t²/8 à partir du temps de vol compté en images (Balsalobre-Fernández et al., 2015, application My Jump) ; la méthode suppose un décollage et un atterrissage jambes tendues, pointes de pieds. Sprint : caméra fixe, perpendiculaire à la piste, plots au sol aux distances voulues, repérer l'image où le torse franchit la ligne ; l'angle et le recul de la caméra introduisent une erreur de parallaxe, et un chronométrage par cellules reste plus précis (Haugen et al., 2019).</div>
@@ -920,6 +944,25 @@ function useVideoResult() {
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+/* zoom / déplacement de l'image */
+const Z = { s: 1, x: 0, y: 0 };
+function zApply() {
+    const w = document.getElementById('vwrap'), v = vidEl();
+    const W = v.clientWidth, H = v.clientHeight;
+    Z.s = Math.max(1, Math.min(8, Z.s));
+    Z.x = Math.min(0, Math.max(W * (1 - Z.s), Z.x));
+    Z.y = Math.min(0, Math.max(H * (1 - Z.s), Z.y));
+    v.style.transform = Z.s === 1 ? '' : 'translate(' + Z.x + 'px,' + Z.y + 'px) scale(' + Z.s + ')';
+    w.classList.toggle('zoomed', Z.s > 1);
+    document.getElementById('zSlider').value = Z.s;
+    setText('zLbl', '×' + (Math.round(Z.s * 10) / 10));
+}
+function zSet(s, px, py) { // zoom en gardant le point (px,py) du cadre fixe
+    const k = Math.max(1, Math.min(8, s)) / Z.s;
+    Z.x = px - (px - Z.x) * k; Z.y = py - (py - Z.y) * k; Z.s *= k;
+    zApply();
+}
+function zCenter() { const v = vidEl(); return [v.clientWidth / 2, v.clientHeight / 2]; }
 function vidPlayToggle() {
     const v = vidEl();
     if (!VID.url) return;
@@ -1047,12 +1090,63 @@ if (typeof document !== 'undefined' && document.getElementById('sprint')) {
         vidRenderMarks(); videoCompute();
     });
     document.getElementById('vidUse').addEventListener('click', useVideoResult);
+    /* zoom */
+    const zw = document.getElementById('vwrap');
+    document.getElementById('zSlider').addEventListener('input', ev => { const c = zCenter(); zSet(parseFloat(ev.target.value), c[0], c[1]); });
+    document.getElementById('zIn').addEventListener('click', () => { const c = zCenter(); zSet(Z.s * 1.5, c[0], c[1]); });
+    document.getElementById('zOut').addEventListener('click', () => { const c = zCenter(); zSet(Z.s / 1.5, c[0], c[1]); });
+    document.getElementById('zReset').addEventListener('click', () => { Z.s = 1; Z.x = 0; Z.y = 0; zApply(); });
+    zw.addEventListener('wheel', ev => {
+        if (!VID.url) return; ev.preventDefault();
+        const r = zw.getBoundingClientRect();
+        zSet(Z.s * (ev.deltaY < 0 ? 1.25 : 0.8), ev.clientX - r.left, ev.clientY - r.top);
+    }, { passive: false });
+    zw.addEventListener('dblclick', ev => {
+        if (!VID.url) return;
+        const r = zw.getBoundingClientRect();
+        if (Z.s > 1) { Z.s = 1; Z.x = 0; Z.y = 0; zApply(); } else zSet(4, ev.clientX - r.left, ev.clientY - r.top);
+    });
+    const ptrs = new Map(); let pinch0 = null;
+    zw.addEventListener('pointerdown', ev => {
+        if (Z.s <= 1 && ev.pointerType === 'mouse') return;
+        ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+        try { zw.setPointerCapture(ev.pointerId); } catch (e) {}
+        zw.classList.add('drag'); pinch0 = null;
+    });
+    zw.addEventListener('pointermove', ev => {
+        const p = ptrs.get(ev.pointerId); if (!p) return;
+        if (ptrs.size === 1) {
+            if (Z.s > 1) { Z.x += ev.clientX - p.x; Z.y += ev.clientY - p.y; zApply(); }
+            p.x = ev.clientX; p.y = ev.clientY;
+        } else if (ptrs.size === 2) {
+            p.x = ev.clientX; p.y = ev.clientY;
+            const a = Array.from(ptrs.values()), d = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y);
+            if (pinch0) { const r = zw.getBoundingClientRect(); zSet(Z.s * d / pinch0, (a[0].x + a[1].x) / 2 - r.left, (a[0].y + a[1].y) / 2 - r.top); }
+            pinch0 = d;
+        }
+    });
+    const pEnd = ev => { ptrs.delete(ev.pointerId); pinch0 = null; if (!ptrs.size) zw.classList.remove('drag'); };
+    zw.addEventListener('pointerup', pEnd); zw.addEventListener('pointercancel', pEnd);
+    window.addEventListener('resize', zApply);
+    vidEl().addEventListener('loadedmetadata', () => { Z.s = 1; Z.x = 0; Z.y = 0; zApply(); });
     document.addEventListener('keydown', ev => {
         if (!document.getElementById('video').classList.contains('active')) return;
         const tag = (ev.target && ev.target.tagName) || '';
         if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
-        if (ev.key === 'ArrowRight') { ev.preventDefault(); vidSeek(VID.frame + 1); }
-        if (ev.key === 'ArrowLeft') { ev.preventDefault(); vidSeek(VID.frame - 1); }
+        const st = ev.shiftKey ? 10 : 1, c = zCenter();
+        if (ev.key === 'ArrowRight') { ev.preventDefault(); vidSeek(VID.frame + st); }
+        else if (ev.key === 'ArrowLeft') { ev.preventDefault(); vidSeek(VID.frame - st); }
+        else if (ev.key === ' ') { ev.preventDefault(); vidPlayToggle(); }
+        else if (ev.key === '+' || ev.key === '=') zSet(Z.s * 1.25, c[0], c[1]);
+        else if (ev.key === '-') zSet(Z.s / 1.25, c[0], c[1]);
+        else if (ev.key === '0') { Z.s = 1; Z.x = 0; Z.y = 0; zApply(); }
+        else if (ev.key === 'm' || ev.key === 'M') {
+            if (!VID.url) return;
+            if (!vidEl().paused) vidPlayToggle();
+            const n = vidLabels().length; let i = 0;
+            while (i < n && VID.marks[i] != null) i++;
+            if (i < n) { VID.marks[i] = VID.frame; vidRenderMarks(); videoCompute(); }
+        }
     });
 
     sprintTestChanged(); jumpUI(); vidModeChanged();
